@@ -1,21 +1,34 @@
-def generate_options(decision, values, openai_api_key):
-    openai.api_key = openai_api_key
-    prompt = f"Given the decision '{decision}' and the values {', '.join(values)}, generate three options: Comfort Option, Avoidance Option, and Aligned Option."
-    
+import os
+import ast
+import json
+from llm.client import get_client
+
+client = get_client()
+MODEL = os.getenv("MODEL")
+
+def generate_options(decision, values):
+
+    prompt = (
+        f"""Given the decision '{decision}' 
+        and the values {', '.join(values)}, 
+        generate three options that reflect different approaches: 
+        1. Comfort Option: a choice that maintains the current state despite its drawbacks.
+        2. Avoidance Option: a choice that avoids facing the decision, potentially leading to negative consequences.
+        3. Aligned Option: take into account values and significance weight, addressing potential value tensions.
+        Please ensure that the Aligned Option considers how to balance these values and the tensions that may arise from pursuing this path.Then provide the options in the format: Comfort: Option, Avoidance: Option, Aligned: Option."""
+    )
+
     try:    
-        response = openai.ChatCompletion.create(      
-            model="gpt-3.5-turbo",        
-            messages=[{"role": "user", "content": prompt}]    
-            )
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0
+        )
 
-        options = response['choices'][0]['message']['content'].strip().split('\n')
-        
-        return {
-            "comfort": options[0],
-            "avoidance": options[1],
-            "aligned": options[2]
-        }
-    
-    except Exception as e:    
-        return {"error": str(e)}
+        # Extracting the response content
+        options = response.choices[0].message.content.strip()
 
+        return {"options": json.loads(options)["options"]}
+
+    except Exception as e:
+        return {"options": {"error": str(e)}}
