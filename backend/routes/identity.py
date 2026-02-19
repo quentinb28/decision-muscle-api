@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, request, jsonify
 from controllers.value_extraction import extract_values
 from controllers.pairwise_ranking import generate_pairwise_questions

@@ -1,5 +1,5 @@
-import openai
 import os
+import openai
 
 def extract_values(anchor_text, openai_api_key):
     openai.api_key = openai_api_key
