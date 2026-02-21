@@ -1,11 +1,10 @@
-from sqlalchemy import Column, String, JSON, DateTime
+from sqlalchemy import Column, Integer, DateTime
 from db.base import Base
+from sqlalchemy import ForeignKey
 
 class ValueCompass(Base):
     __tablename__ = "value_compasses"
 
-    value_compass_id = Column(String, primary_key=True, index=True)
-    user_id = Column(String)
-    values = Column(JSON)
-    scores = Column(JSON)
+    id = Column(Integer, primary_key=True, index=True)
+    identity_anchor_id = Column(Integer, ForeignKey("identity_anchors.id"))
     created_at = Column(DateTime)

@@ -1,17 +1,19 @@
 from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks, Depends
 from db.base import Base
 from db.session import engine, SessionLocal
 
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
+from models.value_score import ValueScore
 from models.decision import Decision
 from models.commitment import Commitment
 from models.execution import Execution
 
 from schemas.identity_anchor import IdentityAnchorCreate
-from schemas.value_compass import ValueCompassCreate
+# from schemas.value_compass import ValueCompassCreate
+# from schemas.value_score import ValueScoreCreate
 from schemas.decision import DecisionCreate
 from schemas.commitment import CommitmentCreate
 from schemas.execution import ExecutionCreate
@@ -23,7 +25,7 @@ from app.metrics.follow_through_rate import calculate_follow_through_rate
 # from app.metrics.integrity_score import calculate_integrity_score
 # from app.metrics.alignment_score import calculate_alignment_score
 
-app = FastAPI()
+app = FastAPI() # https://localhost/docs (ex. http://127.0.0.1:8001/docs)
 Base.metadata.create_all(bind=engine)
 
 @app.get("/")
@@ -35,20 +37,47 @@ def create_identity_anchor(identity_anchor: IdentityAnchorCreate):
 
     db = SessionLocal()
 
-    db_identity_anchor = IdentityAnchor(
-        identity_anchor_id=identity_anchor.identity_anchor_id,
-        user_id=identity_anchor.user_id,
-        description=identity_anchor.description,
-        created_at=identity_anchor.created_at
-    )
+    try:
+        # --- create identity anchor ---
+        db_identity_anchor = IdentityAnchor(
+            user_id=identity_anchor.user_id,
+            description=identity_anchor.description,
+            created_at=identity_anchor.created_at
+            )
 
-    db.add(db_identity_anchor)
-    db.commit()
-    db.refresh(db_identity_anchor)
+        db.add(db_identity_anchor)
+        db.commit()
+        db.refresh(db_identity_anchor)
 
-    db.close()
+        # --- create value compass ---
+        db_value_compass = ValueCompass(
+            identity_anchor_id=db_identity_anchor.id,
+            created_at=db_identity_anchor.created_at
+            )
+        
+        db.add(db_value_compass)
+        db.commit()
+        db.refresh(db_value_compass)
 
-    return {"message": "Identity Anchor registered"}
+        # --- extract top values from identity anchor ---
+        top_values = extract_top_values([db_identity_anchor.description])
+
+        # --- create value compass ---
+        for (value, score) in top_values:
+            db_value_score = ValueScore(
+                value_compass_id=db_value_compass.id,
+                values=value,
+                scores=score
+                )
+
+            db.add(db_value_score)
+            db.commit()
+            db.refresh(db_value_score)
+
+        return {"message": "Identity Anchor + Value Compass registered"}
+
+    finally:
+        db.close()
 
 @app.get("/identity_anchors/{user_id}")
 def get_active_identity_anchor(user_id: str):
@@ -68,44 +97,15 @@ def get_active_identity_anchor(user_id: str):
 
     return identity_anchor
 
-@app.post("/value_compasses/{user_id}") # THINK ABOUT HOW TO SAVE VALUES
-def create_value_compass(value_compass: ValueCompassCreate):
-
-    db = SessionLocal()
-
-    # fetch latest identity anchor
-    identity_anchor = db.query(IdentityAnchor).filter(
-        IdentityAnchor.user_id == user_id
-    ).order_by(
-        IdentityAnchor.created_at.desc()
-    ).first()
-
-    if not identity_anchor:
-        db.close()
-        return {"message": "No identity anchor found"}
-
-    # call AI agent
-    result = extract_top_values(identity_anchor.description)
-
-    values = result["values"]
-    scores = result["scores"]
-
-    # store in DB
-    vc = ValueCompass(
-        value_compass_id=value_compass_id,
-        user_id=user_id,
-        values=values,
-        scores=scores,
-        created_at=datetime.utcnow()
-    )
-
-    db.add(vc)
-    db.commit()
-    db.refresh(vc)
-
-    db.close()
-
-    return vc
+# @app.get("/value-compasses/{user_id}")
+# def get_latest_value_compass(user_id: int, db: DBSession):
+    
+#     return (
+#         db.query(ValueCompass)
+#         .filter(ValueCompass.user_id == user_id)
+#         .order_by(ValueCompass.created_at.desc())
+#         .first()
+#     )
 
 @app.post("/decisions")
 def create_decision(decision: DecisionCreate):
@@ -207,3 +207,4 @@ def get_follow_through_rate(user_id: str):
 # $ python -m uvicorn main:app --reload --port 8001
 # lsof -i :8001
 # kill -9 12569
+# sqlite3 test.db

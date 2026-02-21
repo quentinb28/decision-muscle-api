@@ -3,8 +3,6 @@ from datetime import datetime
 from typing import List
 
 class ValueCompassCreate(BaseModel):
-    value_compass_id: str
-    user_id: str
-    values: List[str]
-    scores: List[float]
+    id: int
+    identity_anchor_id: int
     created_at: datetime

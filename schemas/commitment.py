@@ -2,8 +2,8 @@ from pydantic import BaseModel
 from datetime import datetime
 
 class CommitmentCreate(BaseModel):
-    commitment_id: str
-    decision_id: str
+    id: int
+    decision_id: int
     user_id: str
     next_step: str
     deadline: datetime

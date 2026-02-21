@@ -32,15 +32,14 @@ def extract_top_values(identity_text: str):
 
     Return a JSON with:
 
-    values: list of 5 values
-    scores: list of 5 floats representing estimated importance (sum should add up to 1)
+    values: list of 5 (value, score) pairs
+    scores represent estimated value importance (sum should add up to 1)
 
     Response should be directly parsable using json.loads in the following format:
 
     Format:
     {{
-    "values": ["Integrity", "Growth", ...],
-    "scores": [0.9, 0.8, ...]
+    "values": [("Integrity", 0.9), ("Growth", 0.8), ...]
     }}
     """
 
@@ -51,6 +50,4 @@ def extract_top_values(identity_text: str):
         response_format={"type": "json_object"}
     )
 
-    print(response.choices[0].message.content)
-
-    return json.loads(response.choices[0].message.content)
+    return json.loads(response.choices[0].message.content)["values"]
