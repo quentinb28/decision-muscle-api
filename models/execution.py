@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Boolean, Date
+from sqlalchemy import Column, Integer, String, Date
 from db.base import Base
 from sqlalchemy import ForeignKey
 
@@ -7,6 +7,5 @@ class Execution(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     commitment_id = Column(Integer, ForeignKey("commitments.id"))
-    completed = Column(Boolean)
-    alignment_rating = Column(Float)
+    outcome = Column(String)
     executed_at = Column(Date)

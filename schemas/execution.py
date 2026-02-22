@@ -4,6 +4,5 @@ from datetime import datetime
 class ExecutionCreate(BaseModel):
     id: int
     commitment_id: int
-    completed: bool
-    alignment_rating: float
+    outcome: str
     executed_at: datetime

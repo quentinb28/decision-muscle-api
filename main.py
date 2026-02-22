@@ -3,30 +3,36 @@ from datetime import datetime, timedelta
 from fastapi import FastAPI, BackgroundTasks, Depends
 from db.base import Base
 from db.session import engine, SessionLocal
+from typing import Annotated
+from sqlalchemy.orm import Session
+from db.session import get_db
 
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
-from models.decision import DecisionContext
+from models.decision_context import DecisionContext
 from models.commitment import Commitment
 from models.execution import Execution
 
 from schemas.identity_anchor import IdentityAnchorCreate
 # from schemas.value_compass import ValueCompassCreate
 # from schemas.value_score import ValueScoreCreate
-from schemas.decision import DecisionContextCreate
+from schemas.decision_context import DecisionContextCreate
 from schemas.commitment import CommitmentCreate
 from schemas.execution import ExecutionCreate
 
-from app.ai.extract_values import extract_top_values
+from app.ai.extract_top_values import extract_top_values
+from app.ai.generate_suggestions import generate_suggestions
 
 from app.metrics.follow_through_rate import calculate_follow_through_rate
 # from app.metrics.self_leadership_rate import calculate_self_leadership_rate
 # from app.metrics.integrity_score import calculate_integrity_score
 # from app.metrics.alignment_score import calculate_alignment_score
 
-app = FastAPI() # https://localhost/docs (ex. http://127.0.0.1:8001/docs)
+app = FastAPI()
 Base.metadata.create_all(bind=engine)
+
+DBSession = Annotated[Session, Depends(get_db)]
 
 @app.get("/")
 def root():
@@ -122,7 +128,7 @@ def create_decision_context(decision_context: DecisionContextCreate):
     db_decision = DecisionContext(
         user_id=decision_context.user_id,
         description=decision_context.description,
-        value_compass_id=latest_value_compass
+        value_compass_id=latest_value_compass.id
     )
 
     db.add(db_decision)
@@ -132,6 +138,15 @@ def create_decision_context(decision_context: DecisionContextCreate):
     db.close()
 
     return {"message": "Decision logged"}
+
+@app.post("/commitments/suggestions")
+def get_suggestions(user_id: str, db: DBSession):
+    return generate_suggestions(user_id, db)
+
+# Backend fetches:
+# DecisionContext.text
+# linked ValueCompass
+# top 3 values
 
 @app.post("/commitments")
 def create_commitment(commitment: CommitmentCreate):
@@ -144,7 +159,7 @@ def create_commitment(commitment: CommitmentCreate):
         start_at=datetime.utcnow,
         due_at=datetime.utcnow() + timedelta(hours=48),
         source=commitment.source,
-        status=commitment.status
+        status="active"
     )
 
     db.add(db_commitment)
@@ -155,25 +170,64 @@ def create_commitment(commitment: CommitmentCreate):
 
     return {"message": "Commitment created"}
 
+# background job every hour
+# UPDATE commitment
+# SET status = 'missed'
+# WHERE due_at < now
+# AND status = 'active'
+# def mark_missed_commitments():
+
+#     db = SessionLocal()
+
+#     try:
+#         overdue = db.query(Commitment)\
+#             .filter(
+#                 Commitment.due_at < datetime.utcnow(),
+#                 Commitment.status == "active"
+#             )\
+#             .all()
+
+#         for c in overdue:
+#             c.status = "missed"
+
+#         db.commit()
+
+#     finally:
+#         db.close()
+
 @app.post("/executions")
 def create_execution(execution: ExecutionCreate):
     db = SessionLocal()
 
-    # Save follow-up proof
-    db_execution = Execution(
-        execution_id=execution.execution_id,
-        commitment_id=execution.commitment_id,
-        completed=execution.completed,
-        alignment_rating=execution.alignment_rating,
-        executed_at=execution.executed_at
-    )
-    db.add(db_execution)
-    db.commit()
-    db.refresh(db_execution)
+    try:
+        db_execution = Execution(
+            commitment_id=execution.commitment_id,
+            outcome=execution.outcome,
+            executed_at=datetime.utcnow
+        )
 
-    db.close()
+        db_execution.add(execution)
 
-    return {"message": "Execution recorded"}
+        # fetch related commitment
+        commitment = db.query(Commitment)\
+            .filter(Commitment.id == execution.commitment_id)\
+            .first()
+
+        if not commitment:
+            return {"error": "Commitment not found"}
+
+        if execution.outcome == "done":
+            commitment.status = "completed"
+
+        elif execution.outcome in ["partial", "skipped"]:
+            commitment.status = "missed"
+
+        db.commit()
+
+        return {"message": "Execution recorded"}
+
+    finally:
+        db.close()
 
 @app.get("/metrics/follow-through-rate/{user_id}")
 def get_follow_through_rate(user_id: str):
@@ -196,9 +250,9 @@ def get_follow_through_rate(user_id: str):
 
         latest_execution = db.query(Execution).filter(
             Execution.commitment_id == commitment.commitment_id
-        ).order_by(
+            ).order_by(
             Execution.executed_at.desc()
-        ).first()
+            ).first()
 
         # 3. Check if latest execution completed
         if latest_execution and latest_execution.completed:
@@ -215,3 +269,4 @@ def get_follow_through_rate(user_id: str):
 # lsof -i :8001
 # kill -9 12569
 # sqlite3 test.db
+# http://127.0.0.1:8001/docs

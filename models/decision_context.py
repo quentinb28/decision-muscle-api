@@ -8,6 +8,6 @@ class DecisionContext(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String)
-    descritpion = Column(String)
+    description = Column(String)
     value_compass_id = Column(Integer, ForeignKey("value_compasses.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
