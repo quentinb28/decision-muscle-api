@@ -203,6 +203,7 @@ def create_execution(execution: ExecutionCreate):
         db_execution = Execution(
             commitment_id=execution.commitment_id,
             outcome=execution.outcome,
+            comment=execution.comment,
             executed_at=datetime.utcnow
         )
 

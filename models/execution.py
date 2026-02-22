@@ -7,5 +7,6 @@ class Execution(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     commitment_id = Column(Integer, ForeignKey("commitments.id"))
-    outcome = Column(String)
+    outcome = Column(String) # ("done" | "partial" | "skipped")
+    comment= Column(String)
     executed_at = Column(Date)

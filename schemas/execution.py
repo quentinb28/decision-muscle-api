@@ -5,4 +5,5 @@ class ExecutionCreate(BaseModel):
     id: int
     commitment_id: int
     outcome: str
+    comment: str
     executed_at: datetime
