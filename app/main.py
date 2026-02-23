@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, BackgroundTasks, Depends
+from fastapi import FastAPI, Depends
 from db.base import Base
 from db.session import engine, SessionLocal
 from typing import Annotated
 from sqlalchemy.orm import Session
 from db.session import get_db
+from app.auth import get_current_user
 
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
@@ -24,11 +25,6 @@ from schemas.execution import ExecutionCreate
 from app.ai.extract_top_values import extract_top_values
 from app.ai.generate_suggestions import generate_suggestions
 
-from app.metrics.follow_through_rate import calculate_follow_through_rate
-# from app.metrics.self_leadership_rate import calculate_self_leadership_rate
-# from app.metrics.integrity_score import calculate_integrity_score
-# from app.metrics.alignment_score import calculate_alignment_score
-
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
 
@@ -37,18 +33,35 @@ DBSession = Annotated[Session, Depends(get_db)]
 @app.get("/")
 def root():
     return {"status": "Decision Integrity Engine Running"}
+    
+@app.get("/identity-anchor/active")
+def get_active_identity_anchor(db: DBSession, user_id: str = Depends(get_current_user)):
+
+    identity_anchor = db.query(
+        IdentityAnchor).filter(
+        IdentityAnchor.user_id == user_id).order_by(
+        IdentityAnchor.created_at.desc()).first()
+
+    if not identity_anchor:
+        return {"exists": False}
+
+    return {
+        "exists": True,
+        "id": identity_anchor.id,
+        "description": identity_anchor.description,
+        "created_at": identity_anchor.created_at
+    }
 
 @app.post("/identity_anchors")
-def create_identity_anchor(identity_anchor: IdentityAnchorCreate):
+def create_identity_anchor(identity_anchor: IdentityAnchorCreate, db: DBSession, user_id: str = Depends(get_current_user)):
 
     db = SessionLocal()
 
     try:
         # --- create identity anchor ---
         db_identity_anchor = IdentityAnchor(
-            user_id=identity_anchor.user_id,
+            user_id=user_id,
             description=identity_anchor.description,
-            created_at=identity_anchor.created_at
             )
 
         db.add(db_identity_anchor)
@@ -58,8 +71,7 @@ def create_identity_anchor(identity_anchor: IdentityAnchorCreate):
         # --- create value compass ---
         db_value_compass = ValueCompass(
             identity_anchor_id=db_identity_anchor.id,
-            user_id=db_identity_anchor.user_id,
-            created_at=db_identity_anchor.created_at
+            user_id=user_id,
             )
         
         db.add(db_value_compass)
@@ -280,7 +292,8 @@ def get_self_leadership_rate(user_id: str):
 
     return {"Self Leadership Rate (SLR)": score}
 
-# $ python -m uvicorn main:app --reload --port 8001
+# python -m uvicorn app.main:app --reload --port 8001
+# python -m uvicorn app.main:app --reload
 # lsof -i :8001
 # kill -9 12569
 # sqlite3 test.db
