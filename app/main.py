@@ -98,24 +98,6 @@ def create_identity_anchor(identity_anchor: IdentityAnchorCreate, db: DBSession,
     finally:
         db.close()
 
-@app.get("/identity_anchors/{user_id}")
-def get_active_identity_anchor(user_id: str):
-
-    db = SessionLocal()
-
-    identity_anchor = db.query(IdentityAnchor).filter(
-        IdentityAnchor.user_id == user_id
-    ).order_by(
-        IdentityAnchor.created_at.desc()
-    ).first()
-
-    db.close()
-
-    if not identity_anchor:
-        return {"message": "No identity anchor found"}
-
-    return identity_anchor
-
 # @app.get("/value-compasses/{user_id}")
 # def get_latest_value_compass(user_id: int, db: DBSession):
     

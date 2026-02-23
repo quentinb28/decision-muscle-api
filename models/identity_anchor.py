@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Date
+from sqlalchemy import Column, Integer, String, DateTime
 from db.base import Base
 
 class IdentityAnchor(Base):
@@ -8,4 +8,4 @@ class IdentityAnchor(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String)
     description = Column(String)
-    created_at = Column(Date, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)

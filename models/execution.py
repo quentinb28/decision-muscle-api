@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime
 from db.base import Base
 from sqlalchemy import ForeignKey
 
@@ -9,4 +10,4 @@ class Execution(Base):
     commitment_id = Column(Integer, ForeignKey("commitments.id"))
     outcome = Column(String) # ("done" | "partial" | "skipped")
     comment= Column(String)
-    executed_at = Column(Date)
+    executed_at = Column(DateTime, default=datetime.utcnow)
