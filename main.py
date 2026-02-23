@@ -210,9 +210,9 @@ def create_execution(execution: ExecutionCreate):
         db_execution.add(execution)
 
         # fetch related commitment
-        commitment = db.query(Commitment)\
-            .filter(Commitment.id == execution.commitment_id)\
-            .first()
+        commitment = db.query(Commitment).filter(
+            Commitment.id == execution.commitment_id).first(
+        )
 
         if not commitment:
             return {"error": "Commitment not found"}
@@ -238,33 +238,47 @@ def get_follow_through_rate(user_id: str):
     # 1. Get all commitments for user
     commitments = db.query(Commitment).filter(
         Commitment.user_id == user_id
+    ).filter(
+        Commitment.status != "active"
     ).all()
 
     if len(commitments) == 0:
         db.close()
         return {"Follow Through Rate (FTR)": 0}
     
-    completed_count = 0
+    # 2. Count all completed commitments
+    completed_count = sum([1 for commitment in commitments if commitment.status == "completed"])
 
-    # 2. For each commitment, get latest execution
-    for commitment in commitments:
-
-        latest_execution = db.query(Execution).filter(
-            Execution.commitment_id == commitment.commitment_id
-            ).order_by(
-            Execution.executed_at.desc()
-            ).first()
-
-        # 3. Check if latest execution completed
-        if latest_execution and latest_execution.completed:
-            completed_count += 1
-
-    # 4. Compute score
+    # 3. Compute score
     score = completed_count / len(commitments)
 
     db.close()
 
     return {"Follow Through Rate (FTR)": score}
+
+@app.get("/metrics/self-leadership-rate/{user_id}")
+def get_self_leadership_rate(user_id: str):
+
+    db = SessionLocal()
+
+    # 1. Get all commitments for user
+    commitments = db.query(Commitment).filter(
+        Commitment.user_id == user_id
+    ).all()
+
+    if len(commitments) == 0:
+        db.close()
+        return {"Self Leadership Rate (SLR)": 0}
+    
+    # 2. Count all self endorsed commitments
+    self_endorsed_count = sum([1 for commitment in commitments if commitment.source == "self_endorsed"])
+
+    # 3. Compute score
+    score = self_endorsed_count / len(commitments)
+
+    db.close()
+
+    return {"Self Leadership Rate (SLR)": score}
 
 # $ python -m uvicorn main:app --reload --port 8001
 # lsof -i :8001
