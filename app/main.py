@@ -40,19 +40,20 @@ def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
     # 1️⃣ Identity Anchor
     latest_identity_anchor = db.query(IdentityAnchor).filter(
         IdentityAnchor.user_id == user_id).order_by(
-        IdentityAnchor.created_at.desc()).first()
+        IdentityAnchor.created_at.desc()).first(
+    )
 
     # 2️⃣ Decision Context
     latest_decision_context = db.query(DecisionContext).filter(
         DecisionContext.user_id == user_id).order_by(
-        DecisionContext.created_at.desc()).first()
+        DecisionContext.created_at.desc()).first(
+    )
 
     # 3️⃣ Active Commitments
-    active_commitments = db.query(Commitment).join(
-        DecisionContext, 
-        Commitment.decision_id == DecisionContext.id).filter(
-        DecisionContext.user_id == user_id,
-        Commitment.status == "active").all()
+    active_commitments = db.query(Commitment).filter(
+        Commitment.user_id == user_id,
+        Commitment.status == "active").all(
+    )
 
     remaining_slots = 3 - len(active_commitments)
 
@@ -100,7 +101,7 @@ def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
         "active_commitments": [
             {
                 "id": c.id,
-                "text": c.next_step,
+                "text": c.commitment,
                 "due_at": c.due_at
             }
             for c in active_commitments
@@ -113,7 +114,8 @@ def get_active_identity_anchor(db: DBSession, user_id: str = Depends(get_current
     identity_anchor = db.query(
         IdentityAnchor).filter(
         IdentityAnchor.user_id == user_id).order_by(
-        IdentityAnchor.created_at.desc()).first()
+        IdentityAnchor.created_at.desc()).first(
+    )
 
     if not identity_anchor:
         return {"exists": False}
@@ -125,10 +127,8 @@ def get_active_identity_anchor(db: DBSession, user_id: str = Depends(get_current
         "created_at": identity_anchor.created_at
     }
 
-@app.post("/identity_anchors")
+@app.post("/identity_anchor")
 def create_identity_anchor(identity_anchor: IdentityAnchorCreate, db: DBSession, user_id: str = Depends(get_current_user)):
-
-    db = SessionLocal()
 
     try:
         # --- create identity anchor ---
@@ -171,24 +171,28 @@ def create_identity_anchor(identity_anchor: IdentityAnchorCreate, db: DBSession,
     finally:
         db.close()
 
-# @app.get("/value-compasses/{user_id}")
-# def get_latest_value_compass(user_id: int, db: DBSession):
+@app.get("/value-compass")
+def get_latest_value_compass(db: DBSession, user_id: str = Depends(get_current_user)):
+
+    result = (
+        db.query(
+            ValueScore.values.label("value"),
+            ValueScore.scores.label("score")).join(
+            ValueCompass,
+            ValueScore.value_compass_id == ValueCompass.id).filter(
+            ValueCompass.user_id == user_id).order_by(
+            ValueCompass.created_at.desc()).limit(5).all()
+        )
     
-#     return (
-#         db.query(ValueCompass)
-#         .filter(ValueCompass.user_id == user_id)
-#         .order_by(ValueCompass.created_at.desc())
-#         .first()
-#     )
+    return [row._asdict() for row in result]
 
-@app.post("/decision_contexts")
+@app.post("/decision_context")
 def create_decision_context(decision_context: DecisionContextCreate, db: DBSession, user_id: str = Depends(get_current_user)):
-
-    db = SessionLocal()
 
     latest_value_compass = db.query(ValueCompass).filter(
             ValueCompass.user_id == user_id).order_by(
-            ValueCompass.created_at.desc()).first()
+            ValueCompass.created_at.desc()).first(
+    )
 
     db_decision = DecisionContext(
         user_id=user_id,
@@ -204,27 +208,17 @@ def create_decision_context(decision_context: DecisionContextCreate, db: DBSessi
 
     return {"message": "Decision logged"}
 
-@app.post("/commitments/suggestions")
-def get_suggestions(user_id: str, db: DBSession):
+@app.post("/commitment/suggestions")
+def get_suggestions(db: DBSession, user_id: str = Depends(get_current_user)):
     return generate_suggestions(user_id, db)
 
-# Backend fetches:
-# DecisionContext.text
-# linked ValueCompass
-# top 3 values
-
-@app.post("/commitments")
-def create_commitment(commitment: CommitmentCreate):
-    db = SessionLocal()
-
+@app.post("/commitment")
+def create_commitment(commitment: CommitmentCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+    
     db_commitment = Commitment(
-        decision_id=commitment.decision_id,
-        user_id=commitment.user_id,
-        next_step=commitment.next_step,
-        start_at=datetime.utcnow,
-        due_at=datetime.utcnow() + timedelta(hours=48),
-        source=commitment.source,
-        status="active"
+        user_id=user_id,
+        commitment=commitment.commitment,
+        source=commitment.source
     )
 
     db.add(db_commitment)
@@ -260,19 +254,17 @@ def create_commitment(commitment: CommitmentCreate):
 #     finally:
 #         db.close()
 
-@app.post("/executions")
-def create_execution(execution: ExecutionCreate):
-    db = SessionLocal()
-
+@app.post("/execution")
+def create_execution(execution: ExecutionCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+    
     try:
         db_execution = Execution(
             commitment_id=execution.commitment_id,
             outcome=execution.outcome,
             comment=execution.comment,
-            executed_at=datetime.utcnow
         )
 
-        db_execution.add(execution)
+        db.add(db_execution)
 
         # fetch related commitment
         commitment = db.query(Commitment).filter(
@@ -282,30 +274,30 @@ def create_execution(execution: ExecutionCreate):
         if not commitment:
             return {"error": "Commitment not found"}
 
-        if execution.outcome == "done":
+        if execution.outcome == "completed":
             commitment.status = "completed"
 
-        elif execution.outcome in ["partial", "skipped"]:
+        elif execution.outcome == "missed":
             commitment.status = "missed"
 
         db.commit()
+
+        db.refresh(db_execution)
+        db.refresh(commitment)
 
         return {"message": "Execution recorded"}
 
     finally:
         db.close()
 
-@app.get("/metrics/follow-through-rate/{user_id}")
-def get_follow_through_rate(user_id: str):
-
-    db = SessionLocal()
+@app.get("/metrics/follow-through-rate")
+def get_follow_through_rate(db: DBSession, user_id: str = Depends(get_current_user)):
 
     # 1. Get all commitments for user
     commitments = db.query(Commitment).filter(
-        Commitment.user_id == user_id
-    ).filter(
-        Commitment.status != "active"
-    ).all()
+        Commitment.user_id == user_id).filter(
+        Commitment.status != "active").all(
+    )
 
     if len(commitments) == 0:
         db.close()
@@ -321,15 +313,13 @@ def get_follow_through_rate(user_id: str):
 
     return {"Follow Through Rate (FTR)": score}
 
-@app.get("/metrics/self-leadership-rate/{user_id}")
-def get_self_leadership_rate(user_id: str):
-
-    db = SessionLocal()
+@app.get("/metrics/self-leadership-rate")
+def get_self_leadership_rate(db: DBSession, user_id: str = Depends(get_current_user)):
 
     # 1. Get all commitments for user
     commitments = db.query(Commitment).filter(
-        Commitment.user_id == user_id
-    ).all()
+        Commitment.user_id == user_id).all(
+    )
 
     if len(commitments) == 0:
         db.close()
