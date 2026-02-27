@@ -43,3 +43,15 @@ def get_current_user(
             detail="Invalid authentication credentials"
         )
     
+from datetime import datetime, timedelta
+from jose import jwt
+
+SECRET_KEY = "your-secret"
+ALGORITHM = "HS256"
+
+def create_access_token(user_id: str):
+    payload = {
+        "sub": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=24)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)

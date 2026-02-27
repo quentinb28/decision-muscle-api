@@ -30,9 +30,7 @@ Base.metadata.create_all(bind=engine)
 
 DBSession = Annotated[Session, Depends(get_db)]
 
-@app.get("/")
-def root():
-    return {"status": "Decision Integrity Engine Running"}
+
 
 @app.get("/home")
 def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
