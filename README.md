@@ -92,6 +92,7 @@ The system reduces:
 -   follow-through failure by calibrating commitment level to actual capacity at decision time
 -   alignment failure by identifying value tensions in prospective commitments
 
+```text
 Decision
 ↓
 Capacity Snapshot
@@ -103,9 +104,11 @@ Execution
 Outcome
 ↓
 Calibration Update
+```text
 
 ## 6. Minimum Viable Product (MVP)
 
+```text
 Identity Anchor → Value Compass
 ↓
 Decision Context
@@ -123,6 +126,7 @@ Execution
 Outcome
 ↓
 Agency Model Update
+```text
 
 Effective Capacity (Agency) is estimated as:
 
