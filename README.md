@@ -92,7 +92,7 @@ The system reduces:
 -   follow-through failure by calibrating commitment level to actual capacity at decision time
 -   alignment failure by identifying value tensions in prospective commitments
 
-```text
+```
 Decision
 ↓
 Capacity Snapshot
@@ -108,7 +108,7 @@ Calibration Update
 
 ## 6. Minimum Viable Product (MVP)
 
-```text
+```
 Identity Anchor → Value Compass
 ↓
 Decision Context
