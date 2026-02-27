@@ -104,6 +104,7 @@ Execution
 Outcome
 ↓
 Calibration Update
+```
 
 ## 6. Minimum Viable Product (MVP)
 
@@ -125,6 +126,7 @@ Execution
 Outcome
 ↓
 Agency Model Update
+```
 
 Effective Capacity (Agency) is estimated as:
 
