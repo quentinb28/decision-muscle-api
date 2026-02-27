@@ -22,15 +22,13 @@ Common failure patterns include:
 
 This results in repeated:
 
-miscalibration between responsibility and actual capacity
+miscalibration between responsibility and actual capacity (agency)
 
 which degrades:
 
-self-trust (agency)
+self-trust (agency) over time.
 
-over time.
-
-Decision failure is therefore often not motivational, but operational.
+Decision failure is therefore often not motivational, but *operational*.
 
 ## 2. Mechanism Layer (System Hypothesis)
 
@@ -40,11 +38,10 @@ Perceived Agency ≠ Actual Agency
 
 Users tend to:
 
--   Overestimate their available capacity\
--   Commit under emotional or contextual load\
--   Ignore known personal failure patterns ("Dangers")\
--   Fail to leverage currently available personal resources
-    ("Strengths")
+-   Overestimate their available capacity
+-   Commit under emotional or contextual load
+-   Ignore known personal failure patterns ("Dangers")
+-   Fail to leverage currently available personal resources ("Strengths")
 
 Which results in commitments made:
 
@@ -52,13 +49,11 @@ outside of their Available Action Range (AAR)
 
 AAR represents:
 
-the set of actions realistically executable in the current physiological
-and psychological state.
+the set of actions realistically executable in the current physiological and psychological state.
 
 ## 3. Functional Layer (System Must Do)
 
-If decision failure is driven by capacity miscalibration, the system
-must:
+If decision failure is driven by capacity miscalibration, the system must:
 
 -   Capture user direction (Identity / Value Compass)
 -   Estimate current effective capacity (Agency)
@@ -94,30 +89,53 @@ and progressively expand the user's Decision Muscle.
 
 The system reduces:
 
--   follow-through failure by calibrating commitment level to actual
-    capacity at decision time\
--   alignment failure by identifying value tensions in prospective
-    commitments
+-   follow-through failure by calibrating commitment level to actual capacity at decision time
+-   alignment failure by identifying value tensions in prospective commitments
 
-Decision ↓ Capacity Snapshot ↓ Commitment Calibration ↓ Execution ↓
-Outcome ↓ Calibration Update
+Decision
+↓
+Capacity Snapshot
+↓
+Commitment Calibration
+↓
+Execution
+↓
+Outcome
+↓
+Calibration Update
 
 ## 6. Minimum Viable Product (MVP)
 
-Identity Anchor → Value Compass ↓ Decision Context ↓ Capacity Snapshot ↓
-Active Danger Check ↓ Available Strength Check ↓ Commitment Calibration
-↓ Execution ↓ Outcome ↓ Agency Model Update
+Identity Anchor → Value Compass
+↓
+Decision Context
+↓
+Capacity Snapshot
+↓
+Active Danger Check
+↓
+Available Strength Check
+↓
+Commitment Calibration
+↓
+Execution
+↓
+Outcome
+↓
+Agency Model Update
 
 Effective Capacity (Agency) is estimated as:
 
-Agency = Capacity Snapshot - Active Danger Load + Available Strength
-Support
+Agency = 
+Capacity Snapshot 
+- Active Danger Load 
++ Available Strength Support
 
 ## 7. Future Intelligence
 
--   Regret tagging\
--   Narrative detection\
--   Predictive collapse\
--   Physiological integration\
--   Agentic insights\
+-   Regret tagging
+-   Narrative detection
+-   Predictive collapse
+-   Physiological integration
+-   Agentic insights
 -   Alignment drift alerts
