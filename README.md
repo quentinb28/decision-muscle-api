@@ -73,17 +73,17 @@ and progressively expand the user's Decision Muscle.
 
 ## 4. Component Layer (App Modules)
 
-  Functional Need               Component
-  ----------------------------- --------------------
-  Capture direction             Identity Anchor
-  Score alignment               Value Compass
-  Infer effective capacity      Capacity Snapshot
-  Detect active failure modes   Danger Profile
-  Detect available resources    Strength Profile
-  Estimate task difficulty      Task Input
-  Adjust commitment             Calibration Engine
-  Track execution               Outcome Log
-  Learn over time               Agency Model
+| Functional Need             | Component          |
+|-----------------------------|--------------------|
+| Capture direction           | Identity Anchor    |
+| Score alignment             | Value Compass      |
+| Infer effective capacity    | Capacity Snapshot  |
+| Detect active failure modes | Danger Profile     |
+| Detect available resources  | Strength Profile   |
+| Estimate task difficulty    | Task Input         |
+| Adjust commitment           | Calibration Engine |
+| Track execution             | Outcome Log        |
+| Learn over time             | Agency Model       |
 
 ## 5. Core Loop
 
@@ -104,6 +104,7 @@ Execution
 Outcome
 ↓
 Calibration Update
+´´´text
 
 ## 6. Minimum Viable Product (MVP)
 
@@ -125,6 +126,7 @@ Execution
 Outcome
 ↓
 Agency Model Update
+´´´text
 
 Effective Capacity (Agency) is estimated as:
 
