@@ -1,10 +1,26 @@
 # The Decision Muscle API
 
+## System Objective
+
+The Decision Muscle API is a system designed to reduce decision failure
+by matching responsibility to real-time capacity at the moment of
+commitment.
+
+The identified primary failure mode in humans is:
+
+commitment--capacity mismatch at decision time
+
+People consistently commit to actions that exceed their current
+Available Action Range (AAR), which leads to execution failure, 
+erosion of self-trust, and progressive reduction in perceived agency.
+
+Decision failure is therefore not primarily motivational, but operational.
+
+------------------------------------------------------------------------
+
 ## 1. Problem Layer (Human Reality)
 
-In real life, decision failure rarely comes from a lack of insight.
-
-People typically:
+In real life, people typically:
 
 -   Know what matters to them (direction exists)
 -   Know where they tend to break (failure modes exist)
@@ -14,21 +30,21 @@ Yet still fail to follow through.
 
 Common failure patterns include:
 
--   Committing to misaligned pursuits\
--   Committing beyond current capacity\
--   Choosing feasible but misaligned alternatives\
--   Making decisions under depleted bandwidth\
+-   Committing to misaligned pursuits
+-   Committing beyond current capacity
+-   Choosing feasible but misaligned alternatives
+-   Making decisions under depleted bandwidth
 -   Interpreting execution failure as identity failure
 
 This results in repeated:
 
-miscalibration between responsibility and actual capacity (agency)
+miscalibration between responsibility and actual capacity
 
 which degrades:
 
 self-trust (agency) over time.
 
-Decision failure is therefore often not motivational, but *operational*.
+------------------------------------------------------------------------
 
 ## 2. Mechanism Layer (System Hypothesis)
 
@@ -51,14 +67,16 @@ AAR represents:
 
 the set of actions realistically executable in the current physiological and psychological state.
 
+------------------------------------------------------------------------
+
 ## 3. Functional Layer (System Must Do)
 
-If decision failure is driven by capacity miscalibration, the system must:
+If decision failure is driven by commitment--capacity mismatch, the system must:
 
 -   Capture user direction (Identity / Value Compass)
 -   Estimate current effective capacity (Agency)
--   Surface known personal risk patterns ("Dangers")
--   Surface currently available personal resources ("Strengths")
+-   Surface known personal risk patterns ("Dangers" or "Threats")
+-   Surface currently available personal resources ("Strengths" or "Opportunities")
 -   Estimate task difficulty
 -   Detect overcommitment risk
 -   Recommend responsibility adjustment
@@ -69,11 +87,11 @@ The system's objective is to:
 
 improve responsibility calibration at decision time
 
-and progressively expand the user's Decision Muscle.
+------------------------------------------------------------------------
 
 ## 4. Component Layer (App Modules)
 
-| Functional Need             | Component          |
+  | Functional Need             | Component          |
 |-----------------------------|--------------------|
 | Capture direction           | Identity Anchor    |
 | Score alignment             | Value Compass      |
@@ -85,12 +103,11 @@ and progressively expand the user's Decision Muscle.
 | Track execution             | Outcome Log        |
 | Learn over time             | Agency Model       |
 
+------------------------------------------------------------------------
+
 ## 5. Core Loop
 
-The system reduces:
-
--   follow-through failure by calibrating commitment level to actual capacity at decision time
--   alignment failure by identifying value tensions in prospective commitments
+The system reduces decision failure by calibrating commitment level to actual capacity at decision time.
 
 ```
 Decision
@@ -105,6 +122,8 @@ Outcome
 ↓
 Calibration Update
 ```
+
+------------------------------------------------------------------------
 
 ## 6. Minimum Viable Product (MVP)
 
@@ -130,10 +149,11 @@ Agency Model Update
 
 Effective Capacity (Agency) is estimated as:
 
-Agency = 
-Capacity Snapshot 
-- Active Danger Load 
+Agency = Capacity Snapshot
+- Active Danger Load
 + Available Strength Support
+
+------------------------------------------------------------------------
 
 ## 7. Future Intelligence
 
