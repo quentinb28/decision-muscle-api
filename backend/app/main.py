@@ -35,19 +35,19 @@ DBSession = Annotated[Session, Depends(get_db)]
 @app.get("/home")
 def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
 
-    # 1️⃣ Identity Anchor
+    # Identity Anchor
     latest_identity_anchor = db.query(IdentityAnchor).filter(
         IdentityAnchor.user_id == user_id).order_by(
         IdentityAnchor.created_at.desc()).first(
     )
 
-    # 2️⃣ Decision Context
+    # Decision Context
     latest_decision_context = db.query(DecisionContext).filter(
         DecisionContext.user_id == user_id).order_by(
         DecisionContext.created_at.desc()).first(
     )
 
-    # 3️⃣ Active Commitments
+    # Active Commitments
     active_commitments = db.query(Commitment).filter(
         Commitment.user_id == user_id,
         Commitment.status == "active").all(
@@ -55,7 +55,7 @@ def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
 
     remaining_slots = 3 - len(active_commitments)
 
-    # 4️⃣ Global Available Actions (always)
+    # Global Available Actions (always)
     available_actions = [
         "create_identity_anchor",
         "create_decision_context"
@@ -69,7 +69,7 @@ def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
     else:
         available_actions.append("report_execution")
 
-    # 5️⃣ Primary Suggested Action
+    # Primary Suggested Action
     if not latest_identity_anchor:
         primary = "create_identity_anchor"
         state = "no_identity"
