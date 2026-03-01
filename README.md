@@ -8,7 +8,7 @@ commitment.
 
 The identified primary failure mode in humans is:
 
-commitment--capacity mismatch at decision time
+commitment-capacity mismatch at decision time
 
 People consistently commit to actions that exceed their current
 Available Action Range (AAR), which leads to execution failure, 
