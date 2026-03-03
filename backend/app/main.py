@@ -1,8 +1,6 @@
-from datetime import datetime, timedelta
-
 from fastapi import FastAPI, Depends
 from db.base import Base
-from db.session import engine, SessionLocal
+from db.session import engine
 from typing import Annotated
 from sqlalchemy.orm import Session
 from db.session import get_db
@@ -25,7 +23,8 @@ from schemas.commitment import CommitmentCreate
 from schemas.execution import ExecutionCreate
 
 from app.ai.extract_top_values import extract_top_values
-from app.ai.rank_commitments_from_valued import rank_commitments_from_valued
+from app.ai.rank_commitments_from_values import rank_commitments_from_values
+from app.ai.rank_commitments_from_wisdom import rank_commitments_from_wisdom
 from app.ai.generate_commitment_appraisal import generate_commitment_appraisal
 from app.ai.generate_scaled_commitment import generate_scaled_commitments
 from app.ai.compute_capacity_score import compute_capacity_score
@@ -36,9 +35,11 @@ Base.metadata.create_all(bind=engine)
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-
 @app.get("/home")
-def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
+def get_home_state(
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
     # Identity Anchor
     latest_identity_anchor = db.query(IdentityAnchor).filter(
@@ -112,11 +113,15 @@ def get_home_state(db: DBSession, user_id: str = Depends(get_current_user)):
     }
 
 @app.post("/decision_context")
-def create_decision_context(decision_context: DecisionContextCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+def create_decision_context(
+    payload: DecisionContextCreate, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
     db_decision = DecisionContext(
         user_id=user_id,
-        description=decision_context.description
+        description=payload.description
     )
 
     db.add(db_decision)
@@ -128,55 +133,79 @@ def create_decision_context(decision_context: DecisionContextCreate, db: DBSessi
     return {"message": "Decision Context logged"}
 
 @app.post("/prioritization_filter")
-def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_current_user)):
-    # 1. Get last decision context 
-    latest_decision_context = db.query(DecisionContext).filter(
-        DecisionContext.user_id == user_id).order_by(
-        DecisionContext.created_at.desc()).first(
+def create_prioritization_filter(
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+
+    # Get last decision context
+    latest_decision_context = (
+        db.query(DecisionContext)
+        .filter(DecisionContext.user_id == user_id)
+        .order_by(DecisionContext.created_at.desc())
+        .first()
     )
 
     if not latest_decision_context:
         return {"error": "Decision context not found"}
 
-    # 2. Check if latest_value_compass exists
-    latest_value_compass = db.query(ValueCompass).filter(
-        ValueCompass.user_id == user_id).order_by(
-        ValueCompass.created_at.desc()).first(
+    # Check if latest_value_compass exists
+    latest_value_compass = (
+        db.query(ValueCompass)
+        .filter(ValueCompass.user_id == user_id)
+        .order_by(ValueCompass.created_at.desc())
+        .first()
     )
 
     if latest_value_compass:
 
-        # fetch top 3 values from linked VC
-        top_values = db.query(ValueScore).filter(
-            ValueScore.value_compass_id == latest_value_compass.id).order_by(
-            ValueScore.scores.desc()).limit(3).all()
-        
-        values_str = "\n".join(
-            [f"{v.values}: {round(v.scores, 2)}"for v in top_values]
+        top_values = (
+            db.query(ValueScore)
+            .filter(ValueScore.value_compass_id == latest_value_compass.id)
+            .order_by(ValueScore.scores.desc())
+            .limit(3)
+            .all()
         )
 
-        # create priorities from user value compass
-        priorities = rank_commitments_from_valued(latest_decision_context.description, values_str)
+        values_str = "\n".join(
+            [f"{v.values}: {round(v.scores, 2)}" for v in top_values]
+        )
+
+        priorities = rank_commitments_from_values(
+            latest_decision_context.description,
+            values_str
+        )
+        mode = "values"
 
     else:
 
-        # create priorities from universal regret patterns
-        # priorities = function2(latest_decision_context.description, values_str)
-        return {"error": "Value compass not found"}  # HERE
+        priorities = rank_commitments_from_wisdom(
+            latest_decision_context.description
+        )
+        mode = "wisdom"
 
-    return {
+    # Build response cleanly
+    response = {
         f"priority{i+1}": value
         for i, value in enumerate(priorities)
     }
 
+    response["mode"] = mode
+
+    return response
+
 @app.post("/identity_anchor")
-def create_identity_anchor(identity_anchor: IdentityAnchorCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+def create_identity_anchor(
+    payload: IdentityAnchorCreate, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
     try:
         # --- create identity anchor ---
         db_identity_anchor = IdentityAnchor(
             user_id=user_id,
-            description=identity_anchor.description,
+            description=payload.description,
             )
 
         db.add(db_identity_anchor)
@@ -214,7 +243,10 @@ def create_identity_anchor(identity_anchor: IdentityAnchorCreate, db: DBSession,
         db.close()
 
 @app.get("/identity-anchor/active")
-def get_active_identity_anchor(db: DBSession, user_id: str = Depends(get_current_user)):
+def get_active_identity_anchor(
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
     identity_anchor = db.query(
         IdentityAnchor).filter(
@@ -233,7 +265,10 @@ def get_active_identity_anchor(db: DBSession, user_id: str = Depends(get_current
     }
 
 @app.get("/value-compass/active")
-def get_latest_value_compass(db: DBSession, user_id: str = Depends(get_current_user)):
+def get_latest_value_compass(
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
     result = (
         db.query(
@@ -248,9 +283,13 @@ def get_latest_value_compass(db: DBSession, user_id: str = Depends(get_current_u
     return [row._asdict() for row in result]
 
 @app.post("/capacity_snapshot")
-def create_capacity_snapshot(capacity_snapshot: CapacitySnapshotCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+def create_capacity_snapshot(
+    payload: CapacitySnapshotCreate, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
-    capacity_score = compute_capacity_score(capacity_snapshot)
+    capacity_score = compute_capacity_score(payload)
 
     # 80–100 → High regulatory bandwidth
     # 50–79 → Moderate
@@ -262,7 +301,10 @@ def create_capacity_snapshot(capacity_snapshot: CapacitySnapshotCreate, db: DBSe
     }
 
 @app.post("/commitment_calibration")
-def create_commitment_calibration(payload: CommitmentCalibrationCreate, db: DBSession, user_id: str = Depends(get_current_user)
+def create_commitment_calibration(
+    payload: CommitmentCalibrationCreate, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
 ):
 
     baseline_capacity = payload.baseline_capacity
@@ -297,12 +339,16 @@ def create_commitment_calibration(payload: CommitmentCalibrationCreate, db: DBSe
     }
 
 @app.post("/commitment")
-def create_commitment(commitment: CommitmentCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+def create_commitment(
+    payload: CommitmentCreate, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
     
     db_commitment = Commitment(
         user_id=user_id,
-        commitment=commitment.commitment,
-        source=commitment.source
+        commitment=payload.commitment,
+        source=payload.source
     )
 
     db.add(db_commitment)
@@ -339,29 +385,33 @@ def create_commitment(commitment: CommitmentCreate, db: DBSession, user_id: str 
 #         db.close()
 
 @app.post("/execution")
-def create_execution(execution: ExecutionCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+def create_execution(
+    payload: ExecutionCreate, 
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
     
     try:
         db_execution = Execution(
-            commitment_id=execution.commitment_id,
-            outcome=execution.outcome,
-            comment=execution.comment,
+            commitment_id=payload.commitment_id,
+            outcome=payload.outcome,
+            comment=payload.comment,
         )
 
         db.add(db_execution)
 
         # fetch related commitment
         commitment = db.query(Commitment).filter(
-            Commitment.id == execution.commitment_id).first(
+            Commitment.id == payload.commitment_id).first(
         )
 
         if not commitment:
             return {"error": "Commitment not found"}
 
-        if execution.outcome == "completed":
+        if payload.outcome == "completed":
             commitment.status = "completed"
 
-        elif execution.outcome == "missed":
+        elif payload.outcome == "missed":
             commitment.status = "missed"
 
         db.commit()
@@ -375,7 +425,10 @@ def create_execution(execution: ExecutionCreate, db: DBSession, user_id: str = D
         db.close()
 
 @app.get("/metrics/follow-through-rate")
-def get_follow_through_rate(db: DBSession, user_id: str = Depends(get_current_user)):
+def get_follow_through_rate(
+    db: DBSession, 
+    user_id: str = Depends(get_current_user)
+):
 
     # 1. Get all commitments for user
     commitments = db.query(Commitment).filter(
@@ -398,7 +451,10 @@ def get_follow_through_rate(db: DBSession, user_id: str = Depends(get_current_us
     return {"Follow Through Rate (FTR)": score}
 
 # @app.get("/metrics/self-leadership-rate")
-# def get_self_leadership_rate(db: DBSession, user_id: str = Depends(get_current_user)):
+# def get_self_leadership_rate(
+#     db: DBSession, 
+#     user_id: str = Depends(get_current_user)
+# ):
 
 #     # 1. Get all commitments for user
 #     commitments = db.query(Commitment).filter(
