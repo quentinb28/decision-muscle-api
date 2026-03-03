@@ -20,14 +20,14 @@ from schemas.identity_anchor import IdentityAnchorCreate
 # from schemas.value_score import ValueScoreCreate
 from schemas.decision_context import DecisionContextCreate
 from schemas.capacity_snapshot import CapacitySnapshotCreate
-from schemas.commitment_appraisal import CommitmentAppraisalCreate
-from schemas.adjusted_capacity import AdjustedCapacityCreate
+from schemas.commitment_calibration import CommitmentCalibrationCreate
 from schemas.commitment import CommitmentCreate
 from schemas.execution import ExecutionCreate
 
 from app.ai.extract_top_values import extract_top_values
 from app.ai.rank_commitments_from_valued import rank_commitments_from_valued
 from app.ai.generate_commitment_appraisal import generate_commitment_appraisal
+from app.ai.generate_scaled_commitment import generate_scaled_commitments
 from app.ai.compute_capacity_score import compute_capacity_score
 
 app = FastAPI()
@@ -162,7 +162,7 @@ def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_curre
 
         # create priorities from universal regret patterns
         # priorities = function2(latest_decision_context.description, values_str)
-        return {"error": "Value compass not found"}
+        return {"error": "Value compass not found"}  # HERE
 
     return {
         f"priority{i+1}": value
@@ -261,41 +261,40 @@ def create_capacity_snapshot(capacity_snapshot: CapacitySnapshotCreate, db: DBSe
         "baseline_capacity": capacity_score
     }
 
-@app.post("/commitment_appraisal")
-def create_commitment_appraisal(payload: CommitmentAppraisalCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+@app.post("/commitment_calibration")
+def create_commitment_calibration(payload: CommitmentCalibrationCreate, db: DBSession, user_id: str = Depends(get_current_user)
+):
 
-    commitment_appraisal = generate_commitment_appraisal(payload.candidate_commitment)  # ∈ [1 – 10]
+    baseline_capacity = payload.baseline_capacity
+    candidate_commitment = payload.candidate_commitment
 
-    return {
-        "commitment_appraisal": commitment_appraisal    
-    }
-
-@app.post("/adjusted_capacity")
-def create_adjusted_capacity(payload: AdjustedCapacityCreate, db: DBSession, user_id: str = Depends(get_current_user)):
+    commitment_appraisal = generate_commitment_appraisal(candidate_commitment)
 
     adjusted_capacity = int(
         round(
-            max(1, payload.baseline_capacity * (1 - payload.commitment_appraisal / 10))
+            max(1, baseline_capacity * (1 - commitment_appraisal / 10))
         )
     )
 
     if adjusted_capacity >= 40:
         recommendation = "keep"
+        alternatives = []
+
     elif adjusted_capacity >= 20:
         recommendation = "kneel"
+        alternatives = generate_scaled_commitments(candidate_commitment)
+
     else:
         recommendation = "kill"
+        alternatives = []
 
     return {
-        "baseline_capacity": payload.baseline_capacity,
-        "commitment_load": payload.commitment_appraisal,
+        "baseline_capacity": baseline_capacity,
+        "commitment_appraisal": commitment_appraisal,
         "adjusted_capacity": adjusted_capacity,
-        "recommendation": recommendation
+        "recommendation": recommendation,
+        "alternatives": alternatives
     }
-
-@app.post("/commitment/suggestions")
-def get_suggestions(db: DBSession, user_id: str = Depends(get_current_user)):
-    return generate_suggestions(user_id, db)
 
 @app.post("/commitment")
 def create_commitment(commitment: CommitmentCreate, db: DBSession, user_id: str = Depends(get_current_user)):
@@ -398,27 +397,27 @@ def get_follow_through_rate(db: DBSession, user_id: str = Depends(get_current_us
 
     return {"Follow Through Rate (FTR)": score}
 
-@app.get("/metrics/self-leadership-rate")
-def get_self_leadership_rate(db: DBSession, user_id: str = Depends(get_current_user)):
+# @app.get("/metrics/self-leadership-rate")
+# def get_self_leadership_rate(db: DBSession, user_id: str = Depends(get_current_user)):
 
-    # 1. Get all commitments for user
-    commitments = db.query(Commitment).filter(
-        Commitment.user_id == user_id).all(
-    )
+#     # 1. Get all commitments for user
+#     commitments = db.query(Commitment).filter(
+#         Commitment.user_id == user_id).all(
+#     )
 
-    if len(commitments) == 0:
-        db.close()
-        return {"Self Leadership Rate (SLR)": 0}
+#     if len(commitments) == 0:
+#         db.close()
+#         return {"Self Leadership Rate (SLR)": 0}
     
-    # 2. Count all self endorsed commitments
-    self_endorsed_count = sum([1 for commitment in commitments if commitment.source == "self_endorsed"])
+#     # 2. Count all self endorsed commitments
+#     self_endorsed_count = sum([1 for commitment in commitments if commitment.source == "self_endorsed"])
 
-    # 3. Compute score
-    score = self_endorsed_count / len(commitments)
+#     # 3. Compute score
+#     score = self_endorsed_count / len(commitments)
 
-    db.close()
+#     db.close()
 
-    return {"Self Leadership Rate (SLR)": score}
+#     return {"Self Leadership Rate (SLR)": score}
 
 # python -m uvicorn app.main:app --reload --port 8001
 # python -m uvicorn app.main:app --reload

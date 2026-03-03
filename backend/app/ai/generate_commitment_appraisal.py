@@ -3,8 +3,6 @@ from dotenv import load_dotenv
 import os
 import json
 
-from schemas.commitment_appraisal import CommitmentAppraisalCreate
-
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
