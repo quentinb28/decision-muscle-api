@@ -1,7 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime
 from db.base import Base
-from sqlalchemy import ForeignKey
 
 class DecisionContext(Base):
     __tablename__ = "decision_contexts"
