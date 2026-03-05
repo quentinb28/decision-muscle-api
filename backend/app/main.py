@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import FastAPI, Depends
 from db.base import Base
 from db.session import engine
@@ -6,6 +7,8 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from app.auth import get_current_user
 
+from models.decision_session import DecisionSession
+from models.decision_event import DecisionEvent
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
@@ -29,39 +32,87 @@ from app.ai.generate_commitment_appraisal import generate_commitment_appraisal
 from app.ai.generate_scaled_commitment import generate_scaled_commitments
 from app.ai.compute_capacity_score import compute_capacity_score
 
+import uuid
+
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
 
 DBSession = Annotated[Session, Depends(get_db)]
 
 
+# ------------------------------------------------
+# SESSION + EVENT HELPERS
+# ------------------------------------------------
+
+def start_decision_session(db, user_id, trigger_type):
+
+    session = DecisionSession(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        trigger_type=trigger_type,
+        started_at=datetime.utcnow()
+    )
+
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return session
+
+
+def log_event(
+    db,
+    session_id,
+    event_type,
+    payload=None,
+    commitment_id=None,
+    decision_context_id=None
+):
+
+    event = DecisionEvent(
+        session_id=session_id,
+        event_type=event_type,
+        payload=payload,
+        commitment_id=commitment_id,
+        decision_context_id=decision_context_id,
+        created_at=datetime.utcnow()
+    )
+
+    db.add(event)
+    db.commit()
+
+
+# ------------------------------------------------
+# HOME
+# ------------------------------------------------
+
 @app.get("/home")
 def get_home_state(
-    db: DBSession, 
+    db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
 
-    # Identity Anchor
+    session = start_decision_session(db, user_id, "home_load")
+
     latest_identity_anchor = db.query(IdentityAnchor).filter(
-        IdentityAnchor.user_id == user_id).order_by(
-        IdentityAnchor.created_at.desc()).first(
-    )
+        IdentityAnchor.user_id == user_id
+    ).order_by(
+        IdentityAnchor.created_at.desc()
+    ).first()
 
-    # Decision Context
     latest_decision_context = db.query(DecisionContext).filter(
-        DecisionContext.user_id == user_id).order_by(
-        DecisionContext.created_at.desc()).first(
-    )
+        DecisionContext.user_id == user_id
+    ).order_by(
+        DecisionContext.created_at.desc()
+    ).first()
 
-    # Active Commitments
     active_commitments = db.query(Commitment).filter(
         Commitment.user_id == user_id,
-        Commitment.status == "active").all(
-    )
+        Commitment.status == "active"
+    ).all()
 
     remaining_slots = 3 - len(active_commitments)
 
-    # Global Available Actions (always)
     available_actions = [
         "create_identity_anchor",
         "create_decision_context"
@@ -75,7 +126,6 @@ def get_home_state(
     else:
         available_actions.append("report_execution")
 
-    # Primary Suggested Action
     if not latest_identity_anchor:
         primary = "create_identity_anchor"
         state = "no_identity"
@@ -96,6 +146,19 @@ def get_home_state(
         primary = "report_execution_or_add"
         state = "active_commitments"
 
+    log_event(
+        db,
+        session.id,
+        "context_snapshot",
+        payload={
+            "state": state,
+            "remaining_slots": remaining_slots,
+            "active_commitments": len(active_commitments),
+            "primary_action": primary
+        },
+        decision_context_id=latest_decision_context.id if latest_decision_context else None
+    )
+
     return {
         "state": state,
         "primary_action": primary,
@@ -112,12 +175,140 @@ def get_home_state(
         ]
     }
 
-@app.post("/decision_context")
-def create_decision_context(
-    payload: DecisionContextCreate, 
-    db: DBSession, 
+
+# ------------------------------------------------
+# IDENTITY ANCHOR
+# ------------------------------------------------
+
+@app.post("/identity_anchor")
+def create_identity_anchor(
+    payload: IdentityAnchorCreate,
+    db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
+
+    session = start_decision_session(db, user_id, "identity_anchor_created")
+
+    try:
+
+        db_identity_anchor = IdentityAnchor(
+            user_id=user_id,
+            description=payload.description
+        )
+
+        db.add(db_identity_anchor)
+        db.commit()
+        db.refresh(db_identity_anchor)
+
+        db_value_compass = ValueCompass(
+            identity_anchor_id=db_identity_anchor.id,
+            user_id=user_id
+        )
+
+        db.add(db_value_compass)
+        db.commit()
+        db.refresh(db_value_compass)
+
+        top_values = extract_top_values([db_identity_anchor.description])
+
+        value_pairs = []
+
+        for value, score in top_values:
+
+            db_value_score = ValueScore(
+                value_compass_id=db_value_compass.id,
+                values=value,
+                scores=score
+            )
+
+            db.add(db_value_score)
+            db.commit()
+
+            value_pairs.append({
+                "value": value,
+                "score": score
+            })
+
+        log_event(
+            db,
+            session.id,
+            "identity_anchor_created",
+            payload={
+                "description": payload.description,
+                "values": value_pairs
+            }
+        )
+
+        return {"message": "Identity Anchor + Value Compass registered"}
+
+    finally:
+        db.close()
+
+
+# ------------------------------------------------
+# ACTIVE IDENTITY ANCHOR
+# ------------------------------------------------
+
+@app.get("/identity-anchor/active")
+def get_active_identity_anchor(
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+
+    identity_anchor = db.query(IdentityAnchor).filter(
+        IdentityAnchor.user_id == user_id
+    ).order_by(
+        IdentityAnchor.created_at.desc()
+    ).first()
+
+    if not identity_anchor:
+        return {"exists": False}
+
+    return {
+        "exists": True,
+        "id": identity_anchor.id,
+        "description": identity_anchor.description,
+        "created_at": identity_anchor.created_at
+    }
+
+
+# ------------------------------------------------
+# ACTIVE VALUE COMPASS
+# ------------------------------------------------
+
+@app.get("/value-compass/active")
+def get_latest_value_compass(
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+
+    result = (
+        db.query(
+            ValueScore.values.label("value"),
+            ValueScore.scores.label("score")
+        )
+        .join(ValueCompass, ValueScore.value_compass_id == ValueCompass.id)
+        .filter(ValueCompass.user_id == user_id)
+        .order_by(ValueCompass.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    return [row._asdict() for row in result]
+
+
+# ------------------------------------------------
+# DECISION CONTEXT
+# ------------------------------------------------
+
+@app.post("/decision_context")
+def create_decision_context(
+    payload: DecisionContextCreate,
+    db: DBSession,
+    user_id: str = Depends(get_current_user)
+):
+
+    session = start_decision_session(db, user_id, "decision_context_created")
 
     db_decision = DecisionContext(
         user_id=user_id,
@@ -128,17 +319,26 @@ def create_decision_context(
     db.commit()
     db.refresh(db_decision)
 
-    db.close()
+    log_event(
+        db,
+        session.id,
+        "decision_context_created",
+        payload={"description": payload.description},
+        decision_context_id=db_decision.id
+    )
 
     return {"message": "Decision Context logged"}
 
-@app.post("/prioritization_filter")
-def create_prioritization_filter(
-    db: DBSession,
-    user_id: str = Depends(get_current_user)
-):
 
-    # Get last decision context
+# ------------------------------
+# PRIORITIZATION FILTER
+# ------------------------------
+
+@app.post("/prioritization_filter")
+def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_current_user)):
+
+    session = start_decision_session(db, user_id, "prioritization_filter")
+
     latest_decision_context = (
         db.query(DecisionContext)
         .filter(DecisionContext.user_id == user_id)
@@ -149,7 +349,6 @@ def create_prioritization_filter(
     if not latest_decision_context:
         return {"error": "Decision context not found"}
 
-    # Check if latest_value_compass exists
     latest_value_compass = (
         db.query(ValueCompass)
         .filter(ValueCompass.user_id == user_id)
@@ -175,6 +374,7 @@ def create_prioritization_filter(
             latest_decision_context.description,
             values_str
         )
+
         mode = "values"
 
     else:
@@ -182,9 +382,20 @@ def create_prioritization_filter(
         priorities = rank_commitments_from_wisdom(
             latest_decision_context.description
         )
+
         mode = "wisdom"
 
-    # Build response cleanly
+    log_event(
+        db,
+        session.id,
+        "prioritization_filter_applied",
+        payload={
+            "mode": mode,
+            "priorities": priorities
+        },
+        decision_context_id=latest_decision_context.id
+    )
+
     response = {
         f"priority{i+1}": value
         for i, value in enumerate(priorities)
@@ -194,118 +405,46 @@ def create_prioritization_filter(
 
     return response
 
-@app.post("/identity_anchor")
-def create_identity_anchor(
-    payload: IdentityAnchorCreate, 
-    db: DBSession, 
-    user_id: str = Depends(get_current_user)
-):
 
-    try:
-        # --- create identity anchor ---
-        db_identity_anchor = IdentityAnchor(
-            user_id=user_id,
-            description=payload.description,
-            )
-
-        db.add(db_identity_anchor)
-        db.commit()
-        db.refresh(db_identity_anchor)
-
-        # --- create value compass ---
-        db_value_compass = ValueCompass(
-            identity_anchor_id=db_identity_anchor.id,
-            user_id=user_id,
-            )
-        
-        db.add(db_value_compass)
-        db.commit()
-        db.refresh(db_value_compass)
-
-        # --- extract top values from identity anchor ---
-        top_values = extract_top_values([db_identity_anchor.description])
-
-        # --- create value score pairs ---
-        for (value, score) in top_values:
-            db_value_score = ValueScore(
-                value_compass_id=db_value_compass.id,
-                values=value,
-                scores=score
-                )
-
-            db.add(db_value_score)
-            db.commit()
-            db.refresh(db_value_score)
-
-        return {"message": "Identity Anchor + Value Compass registered"}
-
-    finally:
-        db.close()
-
-@app.get("/identity-anchor/active")
-def get_active_identity_anchor(
-    db: DBSession, 
-    user_id: str = Depends(get_current_user)
-):
-
-    identity_anchor = db.query(
-        IdentityAnchor).filter(
-        IdentityAnchor.user_id == user_id).order_by(
-        IdentityAnchor.created_at.desc()).first(
-    )
-
-    if not identity_anchor:
-        return {"exists": False}
-
-    return {
-        "exists": True,
-        "id": identity_anchor.id,
-        "description": identity_anchor.description,
-        "created_at": identity_anchor.created_at
-    }
-
-@app.get("/value-compass/active")
-def get_latest_value_compass(
-    db: DBSession, 
-    user_id: str = Depends(get_current_user)
-):
-
-    result = (
-        db.query(
-            ValueScore.values.label("value"),
-            ValueScore.scores.label("score")).join(
-            ValueCompass,
-            ValueScore.value_compass_id == ValueCompass.id).filter(
-            ValueCompass.user_id == user_id).order_by(
-            ValueCompass.created_at.desc()).limit(5).all()
-        )
-    
-    return [row._asdict() for row in result]
+# ------------------------------------------------
+# CAPACITY SNAPSHOT
+# ------------------------------------------------
 
 @app.post("/capacity_snapshot")
 def create_capacity_snapshot(
-    payload: CapacitySnapshotCreate, 
-    db: DBSession, 
+    payload: CapacitySnapshotCreate,
+    db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
 
+    session = start_decision_session(db, user_id, "capacity_check")
+
     capacity_score = compute_capacity_score(payload)
 
-    # 80–100 → High regulatory bandwidth
-    # 50–79 → Moderate
-    # 20–49 → Low
-    # 1–19 → High collapse risk
+    log_event(
+        db,
+        session.id,
+        "capacity_calculated",
+        payload={"baseline_capacity": capacity_score}
+    )
 
     return {
         "baseline_capacity": capacity_score
     }
 
+
+# ------------------------------------------------
+# COMMITMENT CALIBRATION
+# ------------------------------------------------
+
 @app.post("/commitment_calibration")
 def create_commitment_calibration(
-    payload: CommitmentCalibrationCreate, 
-    db: DBSession, 
+    payload: CommitmentCalibrationCreate,
+    db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
+
+    session = start_decision_session(db, user_id, "commitment_evaluation")
 
     baseline_capacity = payload.baseline_capacity
     candidate_commitment = payload.candidate_commitment
@@ -330,6 +469,20 @@ def create_commitment_calibration(
         recommendation = "kill"
         alternatives = []
 
+    log_event(
+        db,
+        session.id,
+        "commitment_evaluated",
+        payload={
+            "candidate_commitment": candidate_commitment,
+            "baseline_capacity": baseline_capacity,
+            "commitment_appraisal": commitment_appraisal,
+            "adjusted_capacity": adjusted_capacity,
+            "recommendation": recommendation,
+            "alternatives": alternatives
+        }
+    )
+
     return {
         "baseline_capacity": baseline_capacity,
         "commitment_appraisal": commitment_appraisal,
@@ -338,13 +491,20 @@ def create_commitment_calibration(
         "alternatives": alternatives
     }
 
+
+# ------------------------------------------------
+# CREATE COMMITMENT
+# ------------------------------------------------
+
 @app.post("/commitment")
 def create_commitment(
-    payload: CommitmentCreate, 
-    db: DBSession, 
+    payload: CommitmentCreate,
+    db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
-    
+
+    session = start_decision_session(db, user_id, "commitment_created")
+
     db_commitment = Commitment(
         user_id=user_id,
         commitment=payload.commitment,
@@ -355,47 +515,75 @@ def create_commitment(
     db.commit()
     db.refresh(db_commitment)
 
-    db.close()
+    log_event(
+        db,
+        session.id,
+        "commitment_created",
+        commitment_id=db_commitment.id,
+        payload={
+            "text": payload.commitment,
+            "source": payload.source
+        }
+    )
 
     return {"message": "Commitment created"}
 
+
+# ------------------------------------------------
+# EXECUTION
+# ------------------------------------------------
+
 @app.post("/execution")
 def create_execution(
-    payload: ExecutionCreate, 
-    db: DBSession, 
+    payload: ExecutionCreate,
+    db: DBSession,
     user_id: str = Depends(get_current_user)
 ):
-    
+
+    session = start_decision_session(db, user_id, "commitment_execution")
+
     try:
+
         db_execution = Execution(
             commitment_id=payload.commitment_id,
             user_id=user_id,
             outcome=payload.outcome,
-            prompt_response=payload.prompt_response,
+            prompt_response=payload.prompt_response
         )
 
         db.add(db_execution)
 
-        # fetch related commitment
         commitment = db.query(Commitment).filter(
-            Commitment.id == payload.commitment_id).first(
-        )
+            Commitment.id == payload.commitment_id
+        ).first()
 
         if not commitment:
             raise ValueError("Commitment not found")
-        
-        # update column
+
         commitment.status = payload.outcome
 
         db.commit()
 
-        db.refresh(db_execution)
-        db.refresh(commitment)
+        log_event(
+            db,
+            session.id,
+            "commitment_action_taken",
+            commitment_id=payload.commitment_id,
+            payload={
+                "outcome": payload.outcome,
+                "prompt_response": payload.prompt_response
+            }
+        )
 
         return {"message": "Execution recorded"}
 
     finally:
         db.close()
+
+
+# ------------------------------------------------
+# COMPUTE METRICS
+# ------------------------------------------------
 
 @app.get("/metrics/follow-through-rate")
 def get_follow_through_rate(
