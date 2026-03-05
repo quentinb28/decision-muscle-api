@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from app.auth import get_current_user
 
+from models.user import User
 from models.decision_session import DecisionSession
 from models.decision_event import DecisionEvent
 from models.identity_anchor import IdentityAnchor
