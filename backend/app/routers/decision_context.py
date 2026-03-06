@@ -15,7 +15,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/decision_context")
+@router.post("/decision_context")
 def create_decision_context(
     payload: DecisionContextCreate,
     db: DBSession,

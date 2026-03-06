@@ -18,7 +18,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/identity_anchor")
+@router.post("/identity_anchor")
 def create_identity_anchor(
     payload: IdentityAnchorCreate,
     db: DBSession,

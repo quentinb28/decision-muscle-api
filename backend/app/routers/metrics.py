@@ -12,7 +12,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.get("/metrics/follow-through-rate")
+@router.get("/metrics/follow-through-rate")
 def get_follow_through_rate(
     db: DBSession, 
     user_id: str = Depends(get_current_user)

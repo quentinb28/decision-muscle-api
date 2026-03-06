@@ -14,7 +14,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/capacity_snapshot")
+@router.post("/capacity_snapshot")
 def create_capacity_snapshot(
     payload: CapacitySnapshotCreate,
     db: DBSession,

@@ -15,7 +15,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/commitment")
+@router.post("/commitment")
 def create_commitment(
     payload: CommitmentCreate,
     db: DBSession,

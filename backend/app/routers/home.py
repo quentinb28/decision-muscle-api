@@ -15,7 +15,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.get("/home")
+@router.get("/home")
 def get_home_state(
     db: DBSession,
     user_id: str = Depends(get_current_user)

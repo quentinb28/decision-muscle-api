@@ -15,7 +15,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/commitment_calibration")
+@router.post("/commitment_calibration")
 def create_commitment_calibration(
     payload: CommitmentCalibrationCreate,
     db: DBSession,

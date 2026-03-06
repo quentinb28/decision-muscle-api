@@ -20,7 +20,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/prioritization_filter")
+@router.post("/prioritization_filter")
 def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_current_user)):
 
     session = start_decision_session(db, user_id, "prioritization_filter")

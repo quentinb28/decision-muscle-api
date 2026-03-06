@@ -16,7 +16,7 @@ router = APIRouter()
 DBSession = Annotated[Session, Depends(get_db)]
 
 
-@app.post("/execution")
+@router.post("/execution")
 def create_execution(
     payload: ExecutionCreate,
     db: DBSession,
