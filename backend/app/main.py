@@ -291,7 +291,6 @@ def get_latest_value_compass(
         .join(ValueCompass, ValueScore.value_compass_id == ValueCompass.id)
         .filter(ValueCompass.user_id == user_id)
         .order_by(ValueCompass.created_at.desc())
-        .limit(5)
         .all()
     )
 
@@ -363,7 +362,6 @@ def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_curre
             db.query(ValueScore)
             .filter(ValueScore.value_compass_id == latest_value_compass.id)
             .order_by(ValueScore.scores.desc())
-            .limit(3)
             .all()
         )
 
@@ -603,7 +601,7 @@ def get_follow_through_rate(
         return {"Follow Through Rate (FTR)": 0}
     
     # 2. Count all completed commitments
-    completed_count = sum([1 for commitment in commitments if commitment.status == "completed"])
+    completed_count = sum([1 for commitment in commitments if commitment.status == "fully_completed"])
 
     # 3. Compute score
     score = completed_count / len(commitments)
