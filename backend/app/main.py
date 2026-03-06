@@ -7,14 +7,14 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 
 from app.routers import home
-from routers import identity
-from routers import prioritization_filter
-from routers import decision_context
-from routers import capacity_snapshot
-from routers import commitment_calibration
-from routers import commitment
-from routers import execution
-from routers import metrics
+from app.routers import identity
+from app.routers import prioritization_filter
+from app.routers import decision_context
+from app.routers import capacity_snapshot
+from app.routers import commitment_calibration
+from app.routers import commitment
+from app.routers import execution
+from app.routers import metrics
 
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
