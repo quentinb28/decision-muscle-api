@@ -13,5 +13,6 @@ class Commitment(Base):
     start_at = Column(DateTime, default=datetime.utcnow) # = created_at
     due_at = Column(DateTime, default=datetime.utcnow() + timedelta(minutes=5)) # start_at + 48 hours
     source = Column(String) # ("self_endorsed" | "ai_generated")
-    status = Column(String, default="active") # ("active" | "fully_completed" | "partially_completed" | "expired")
+    status = Column(String, default="active") # ("active" | "completed" | "expired")
+    calendar_event_id = Column(String, nullable=True, default=None)
     

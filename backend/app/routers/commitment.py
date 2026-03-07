@@ -5,9 +5,11 @@ from typing import Annotated
 from db.session import get_db
 from app.auth import get_current_user
 from app.services.decision_logger import start_decision_session, log_event
+from app.services.google_calendar import create_calendar_event
 
 from schemas.commitment import CommitmentCreate
 
+from models.user import User
 from models.commitment import Commitment
 
 router = APIRouter()
@@ -27,12 +29,24 @@ def create_commitment(
     db_commitment = Commitment(
         user_id=user_id,
         commitment=payload.commitment,
-        source=payload.source
+        source=payload.source    
     )
 
     db.add(db_commitment)
     db.commit()
     db.refresh(db_commitment)
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    event_id = create_calendar_event(
+        access_token=user.google_access_token,
+        commitment_text=payload.commitment,
+        start_time=payload.start_time,
+        end_time=payload.end_time
+    )
+
+    db_commitment.calendar_event_id = event_id
+    db.commit()
 
     log_event(
         db,

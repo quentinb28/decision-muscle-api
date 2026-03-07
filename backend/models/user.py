@@ -11,3 +11,4 @@ class User(Base):
     email = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    google_access_token = Column(String)
