@@ -9,6 +9,8 @@ from app.ai.compute_capacity_score import compute_capacity_score
 
 from schemas.capacity_snapshot import CapacitySnapshotCreate
 
+from models.user import User
+
 router = APIRouter()
 
 DBSession = Annotated[Session, Depends(get_db)]
@@ -18,10 +20,10 @@ DBSession = Annotated[Session, Depends(get_db)]
 def create_capacity_snapshot(
     payload: CapacitySnapshotCreate,
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "capacity_check")
+    session = start_decision_session(db, current_user.id, "capacity_check")
 
     capacity_score = compute_capacity_score(payload)
 

@@ -8,6 +8,7 @@ from app.services.decision_logger import start_decision_session, log_event
 
 from schemas.execution import ExecutionCreate
 
+from models.user import User
 from models.execution import Execution
 from models.commitment import Commitment
 
@@ -20,16 +21,16 @@ DBSession = Annotated[Session, Depends(get_db)]
 def create_execution(
     payload: ExecutionCreate,
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "commitment_execution")
+    session = start_decision_session(db, current_user.id, "commitment_execution")
 
     try:
 
         db_execution = Execution(
             commitment_id=payload.commitment_id,
-            user_id=user_id,
+            user_id=current_user.id,
             outcome=payload.outcome,
             prompt_response=payload.prompt_response
         )

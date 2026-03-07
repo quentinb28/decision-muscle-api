@@ -10,6 +10,7 @@ from app.ai.rank_commitments_from_wisdom import rank_commitments_from_wisdom
 
 from schemas.commitment import CommitmentCreate
 
+from models.user import User
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
 
@@ -21,13 +22,16 @@ DBSession = Annotated[Session, Depends(get_db)]
 
 
 @router.post("/prioritization_filter")
-def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_current_user)):
+def create_prioritization_filter(
+    db: DBSession, 
+    current_user: User = Depends(get_current_user)
+):
 
-    session = start_decision_session(db, user_id, "prioritization_filter")
+    session = start_decision_session(db, current_user.id, "prioritization_filter")
 
     latest_decision_context = (
         db.query(DecisionContext)
-        .filter(DecisionContext.user_id == user_id)
+        .filter(DecisionContext.user_id == current_user.id)
         .order_by(DecisionContext.created_at.desc())
         .first()
     )
@@ -37,7 +41,7 @@ def create_prioritization_filter(db: DBSession, user_id: str = Depends(get_curre
 
     latest_value_compass = (
         db.query(ValueCompass)
-        .filter(ValueCompass.user_id == user_id)
+        .filter(ValueCompass.user_id == current_user.id)
         .order_by(ValueCompass.created_at.desc())
         .first()
     )

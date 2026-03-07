@@ -9,6 +9,7 @@ from app.ai.extract_top_values import extract_top_values
 
 from schemas.identity_anchor import IdentityAnchorCreate
 
+from models.user import User
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
@@ -22,15 +23,15 @@ DBSession = Annotated[Session, Depends(get_db)]
 def create_identity_anchor(
     payload: IdentityAnchorCreate,
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "identity_anchor_created")
+    session = start_decision_session(db, current_user.id, "identity_anchor_created")
 
     try:
 
         db_identity_anchor = IdentityAnchor(
-            user_id=user_id,
+            user_id=current_user.id,
             description=payload.description
         )
 
@@ -40,7 +41,7 @@ def create_identity_anchor(
 
         db_value_compass = ValueCompass(
             identity_anchor_id=db_identity_anchor.id,
-            user_id=user_id
+            user_id=current_user.id
         )
 
         db.add(db_value_compass)

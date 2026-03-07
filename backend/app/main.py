@@ -6,6 +6,7 @@ from typing import Annotated
 from sqlalchemy.orm import Session
 from app.auth import get_current_user
 
+from app.routers import google_auth
 from app.routers import home
 from app.routers import identity
 from app.routers import prioritization_filter
@@ -16,6 +17,7 @@ from app.routers import commitment
 from app.routers import execution
 from app.routers import metrics
 
+from models.user import User
 from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
@@ -33,6 +35,7 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 # routers
+app.include_router(google_auth.router)
 app.include_router(home.router)
 app.include_router(identity.router)
 app.include_router(prioritization_filter.router)
@@ -106,3 +109,10 @@ def get_latest_value_compass(
 # crontab 48 hours: 0 0 */2 * *
 # sqlite3 test.db
 # finder: DB Browser for SQLite
+
+{
+  "commitment": "Test Commitment",
+  "source": "self_endorsed",
+  "start_time": "2026-03-08T10:00:00Z",
+  "end_time": "2026-03-08T11:00:00Z"
+}

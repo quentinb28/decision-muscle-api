@@ -10,6 +10,8 @@ from app.ai.generate_scaled_commitments import generate_scaled_commitments
 
 from schemas.commitment_calibration import CommitmentCalibrationCreate
 
+from models.user import User
+
 router = APIRouter()
 
 DBSession = Annotated[Session, Depends(get_db)]
@@ -19,10 +21,10 @@ DBSession = Annotated[Session, Depends(get_db)]
 def create_commitment_calibration(
     payload: CommitmentCalibrationCreate,
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "commitment_evaluation")
+    session = start_decision_session(db, current_user.id, "commitment_evaluation")
 
     baseline_capacity = payload.baseline_capacity
     candidate_commitment = payload.candidate_commitment

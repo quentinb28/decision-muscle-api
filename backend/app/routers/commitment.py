@@ -10,6 +10,7 @@ from app.services.google_calendar import create_calendar_event
 from schemas.commitment import CommitmentCreate
 
 from models.user import User
+from models.user import User
 from models.commitment import Commitment
 
 router = APIRouter()
@@ -21,13 +22,13 @@ DBSession = Annotated[Session, Depends(get_db)]
 def create_commitment(
     payload: CommitmentCreate,
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "commitment_created")
+    session = start_decision_session(db, current_user.id, "commitment_created")
 
     db_commitment = Commitment(
-        user_id=user_id,
+        user_id=current_user.id,
         commitment=payload.commitment,
         source=payload.source    
     )
@@ -36,10 +37,10 @@ def create_commitment(
     db.commit()
     db.refresh(db_commitment)
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == current_user.id).first()
 
     event_id = create_calendar_event(
-        access_token=user.google_access_token,
+        user=current_user,
         commitment_text=payload.commitment,
         start_time=payload.start_time,
         end_time=payload.end_time

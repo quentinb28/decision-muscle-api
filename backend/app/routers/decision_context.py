@@ -8,6 +8,7 @@ from app.services.decision_logger import start_decision_session, log_event
 
 from schemas.decision_context import DecisionContextCreate
 
+from models.user import User
 from models.decision_context import DecisionContext
 
 router = APIRouter()
@@ -19,13 +20,13 @@ DBSession = Annotated[Session, Depends(get_db)]
 def create_decision_context(
     payload: DecisionContextCreate,
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "decision_context_created")
+    session = start_decision_session(db, current_user.id, "decision_context_created")
 
     db_decision = DecisionContext(
-        user_id=user_id,
+        user_id=current_user.id,
         description=payload.description
     )
 

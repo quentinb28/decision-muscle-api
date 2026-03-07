@@ -5,6 +5,7 @@ from typing import Annotated
 from db.session import get_db
 from app.auth import get_current_user
 
+from models.user import User
 from models.commitment import Commitment
 
 router = APIRouter()
@@ -15,12 +16,12 @@ DBSession = Annotated[Session, Depends(get_db)]
 @router.get("/metrics/follow-through-rate")
 def get_follow_through_rate(
     db: DBSession, 
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
     # 1. Get all commitments for user
     commitments = db.query(Commitment).filter(
-        Commitment.user_id == user_id).filter(
+        Commitment.user_id == current_user.id).filter(
         Commitment.status != "active").all(
     )
 

@@ -6,6 +6,7 @@ from db.session import get_db
 from app.auth import get_current_user
 from app.services.decision_logger import start_decision_session, log_event
 
+from models.user import User
 from models.identity_anchor import IdentityAnchor
 from models.decision_context import DecisionContext
 from models.commitment import Commitment
@@ -18,25 +19,25 @@ DBSession = Annotated[Session, Depends(get_db)]
 @router.get("/home")
 def get_home_state(
     db: DBSession,
-    user_id: str = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, user_id, "home_load")
+    session = start_decision_session(db, current_user.id, "home_load")
 
     latest_identity_anchor = db.query(IdentityAnchor).filter(
-        IdentityAnchor.user_id == user_id
+        IdentityAnchor.user_id == current_user.id
     ).order_by(
         IdentityAnchor.created_at.desc()
     ).first()
 
     latest_decision_context = db.query(DecisionContext).filter(
-        DecisionContext.user_id == user_id
+        DecisionContext.user_id == current_user.id
     ).order_by(
         DecisionContext.created_at.desc()
     ).first()
 
     active_commitments = db.query(Commitment).filter(
-        Commitment.user_id == user_id,
+        Commitment.user_id == current_user.id,
         Commitment.status == "active"
     ).all()
 
@@ -47,10 +48,9 @@ def get_home_state(
         session.id,
         "context_snapshot",
         payload={
-            "state": state,
             "remaining_slots": remaining_slots,
-            "active_commitments": len(active_commitments),
-            "primary_action": primary
+            "decision_context": latest_decision_context.description if latest_decision_context else None,
+            "active_commitments": len(active_commitments)
         },
         decision_context_id=latest_decision_context.id if latest_decision_context else None
     )

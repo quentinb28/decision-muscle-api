@@ -1,7 +1,10 @@
+import requests
 from jose import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import requests
+from db.session import get_db
+from sqlalchemy.orm import Session
+from models.user import User
 
 security = HTTPBearer()
 
@@ -9,32 +12,44 @@ JWKS_URL = "https://ubaicyenptbgyayhnwpq.supabase.co/auth/v1/.well-known/jwks.js
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
 ):
     token = credentials.credentials
 
     try:
-        # fetch Supabase public keys
         jwks = requests.get(JWKS_URL).json()
 
-        # get token header
         unverified_header = jwt.get_unverified_header(token)
 
-        # find correct key
         key = next(
             k for k in jwks["keys"]
             if k["kid"] == unverified_header["kid"]
         )
 
-        # jose supports EC directly
         payload = jwt.decode(
             token,
             key,
             algorithms=["ES256"],
             audience="authenticated"
         )
+    
+        user_id = payload["sub"]
 
-        return payload["sub"]
+        user = db.query(User).filter(User.id == user_id).first()
+
+        if not user:
+            user = User(
+                id=user_id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+        return user
 
     except Exception as e:
         print("JWT ERROR:", e)
@@ -44,7 +59,6 @@ def get_current_user(
         )
     
 from datetime import datetime, timedelta
-from jose import jwt
 
 SECRET_KEY = "your-secret"
 ALGORITHM = "HS256"
