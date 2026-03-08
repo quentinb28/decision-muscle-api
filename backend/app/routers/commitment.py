@@ -10,7 +10,6 @@ from app.services.google_calendar import create_calendar_event
 from schemas.commitment import CommitmentCreate
 
 from models.user import User
-from models.user import User
 from models.commitment import Commitment
 
 router = APIRouter()
@@ -25,7 +24,11 @@ def create_commitment(
     current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, current_user.id, "commitment_created")
+    session = start_decision_session(
+        db, 
+        current_user.id, 
+        "commitment_created"
+    )
 
     db_commitment = Commitment(
         user_id=current_user.id,
@@ -37,18 +40,24 @@ def create_commitment(
     db.commit()
     db.refresh(db_commitment)
 
-    user = db.query(User).filter(User.id == current_user.id).first()
+    # create calendar event (safe)
+    try:
 
-    event_id = create_calendar_event(
-        user=current_user,
-        commitment_text=payload.commitment,
-        start_time=payload.start_time,
-        end_time=payload.end_time
-    )
+        event_id = create_calendar_event(
+            user=current_user,
+            commitment_text=payload.commitment,
+            start_time=payload.start_time,
+            end_time=payload.end_time
+        )
 
-    db_commitment.calendar_event_id = event_id
-    db.commit()
+        db_commitment.calendar_event_id = event_id
+        db.commit()
 
+    except Exception as e:
+
+        print("Calendar event creation failed:", e)
+
+    # log decision event
     log_event(
         db,
         session.id,
@@ -60,4 +69,7 @@ def create_commitment(
         }
     )
 
-    return {"message": "Commitment created"}
+    return {
+        "message": "Commitment created",
+        "commitment_id": db_commitment.id
+    }

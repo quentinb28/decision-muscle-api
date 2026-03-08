@@ -1,16 +1,20 @@
-from schemas.capacity_snapshot import CapacitySnapshotCreate
-
-def compute_capacity_score(snapshot: CapacitySnapshotCreate) -> int:
+def compute_capacity_score(
+        sleep_quality: int, 
+        stress_level: int, 
+        energy_level: int, 
+        emotional_state: int, 
+        social_demand: int
+) -> int:
     
     positive = (
-        snapshot.sleep_quality +
-        snapshot.energy_level +
-        snapshot.emotional_state
+        sleep_quality +
+        energy_level +
+        emotional_state
     )
 
     negative = (
-        6 - snapshot.stress_level +
-        6 - snapshot.social_demand
+        6 - stress_level +
+        6 - social_demand
     )
 
     total_score = positive + negative  # max = 25, min = 5

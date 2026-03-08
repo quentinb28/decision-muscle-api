@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Annotated
 
@@ -12,6 +12,7 @@ from models.user import User
 from models.execution import Execution
 from models.commitment import Commitment
 
+
 router = APIRouter()
 
 DBSession = Annotated[Session, Depends(get_db)]
@@ -24,42 +25,54 @@ def create_execution(
     current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, current_user.id, "commitment_execution")
+    session = start_decision_session(
+        db,
+        current_user.id,
+        "commitment_execution"
+    )
 
-    try:
+    # find commitment
+    commitment = db.query(Commitment).filter(
+        Commitment.id == payload.commitment_id,
+        Commitment.user_id == current_user.id
+    ).first()
 
-        db_execution = Execution(
-            commitment_id=payload.commitment_id,
-            user_id=current_user.id,
-            outcome=payload.outcome,
-            prompt_response=payload.prompt_response
+    if not commitment:
+        raise HTTPException(
+            status_code=404,
+            detail="Commitment not found"
         )
 
-        db.add(db_execution)
+    # create execution record
+    db_execution = Execution(
+        commitment_id=payload.commitment_id,
+        user_id=current_user.id,
+        outcome=payload.outcome,
+        prompt_response=payload.prompt_response
+    )
 
-        commitment = db.query(Commitment).filter(
-            Commitment.id == payload.commitment_id
-        ).first()
+    db.add(db_execution)
 
-        if not commitment:
-            raise ValueError("Commitment not found")
+    # update commitment status
+    commitment.status = payload.outcome
 
-        commitment.status = payload.outcome
+    db.commit()
+    db.refresh(db_execution)
 
-        db.commit()
+    # log decision event
+    log_event(
+        db,
+        session.id,
+        "commitment_action_taken",
+        commitment_id=payload.commitment_id,
+        payload={
+            "outcome": payload.outcome,
+            "prompt_response": payload.prompt_response
+        }
+    )
 
-        log_event(
-            db,
-            session.id,
-            "commitment_action_taken",
-            commitment_id=payload.commitment_id,
-            payload={
-                "outcome": payload.outcome,
-                "prompt_response": payload.prompt_response
-            }
-        )
-
-        return {"message": "Execution recorded"}
-
-    finally:
-        db.close()
+    return {
+        "message": "Execution recorded",
+        "commitment_id": payload.commitment_id,
+        "outcome": payload.outcome
+    }

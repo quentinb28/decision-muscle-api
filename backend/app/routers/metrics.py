@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Annotated
 
 from db.session import get_db
@@ -8,6 +9,7 @@ from app.auth import get_current_user
 from models.user import User
 from models.commitment import Commitment
 
+
 router = APIRouter()
 
 DBSession = Annotated[Session, Depends(get_db)]
@@ -15,29 +17,32 @@ DBSession = Annotated[Session, Depends(get_db)]
 
 @router.get("/metrics/follow-through-rate")
 def get_follow_through_rate(
-    db: DBSession, 
+    db: DBSession,
     current_user: User = Depends(get_current_user)
 ):
 
-    # 1. Get all commitments for user
-    commitments = db.query(Commitment).filter(
-        Commitment.user_id == current_user.id).filter(
-        Commitment.status != "active").all(
-    )
+    # total completed or expired commitments
+    total_commitments = db.query(func.count(Commitment.id)).filter(
+        Commitment.user_id == current_user.id,
+        Commitment.status != "active"
+    ).scalar()
 
-    if len(commitments) == 0:
-        db.close()
-        return {"Follow Through Rate (FTR)": 0}
-    
-    # 2. Count all completed commitments
-    completed_count = sum([1 for commitment in commitments if commitment.status == "fully_completed"])
+    if total_commitments == 0:
+        return {"follow_through_rate": 0}
 
-    # 3. Compute score
-    score = completed_count / len(commitments)
+    # completed commitments
+    completed_count = db.query(func.count(Commitment.id)).filter(
+        Commitment.user_id == current_user.id,
+        Commitment.status == "fully_completed"
+    ).scalar()
 
-    db.close()
+    score = completed_count / total_commitments
 
-    return {"Follow Through Rate (FTR)": score}
+    return {
+        "follow_through_rate": score,
+        "completed_commitments": completed_count,
+        "total_commitments": total_commitments
+    }
 
 # @app.get("/metrics/self-leadership-rate")
 # def get_self_leadership_rate(

@@ -14,6 +14,7 @@ from models.identity_anchor import IdentityAnchor
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
 
+
 router = APIRouter()
 
 DBSession = Annotated[Session, Depends(get_db)]
@@ -26,59 +27,65 @@ def create_identity_anchor(
     current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, current_user.id, "identity_anchor_created")
+    session = start_decision_session(
+        db,
+        current_user.id,
+        "identity_anchor_created"
+    )
 
-    try:
+    # create identity anchor
+    db_identity_anchor = IdentityAnchor(
+        user_id=current_user.id,
+        description=payload.description
+    )
 
-        db_identity_anchor = IdentityAnchor(
-            user_id=current_user.id,
-            description=payload.description
+    db.add(db_identity_anchor)
+    db.flush()  # get ID without committing
+
+    # create value compass
+    db_value_compass = ValueCompass(
+        identity_anchor_id=db_identity_anchor.id,
+        user_id=current_user.id
+    )
+
+    db.add(db_value_compass)
+    db.flush()
+
+    # extract top values from AI
+    top_values = extract_top_values([payload.description])
+
+    value_pairs = []
+
+    for value, score in top_values:
+
+        db_value_score = ValueScore(
+            value_compass_id=db_value_compass.id,
+            values=value,
+            scores=score
         )
 
-        db.add(db_identity_anchor)
-        db.commit()
-        db.refresh(db_identity_anchor)
+        db.add(db_value_score)
 
-        db_value_compass = ValueCompass(
-            identity_anchor_id=db_identity_anchor.id,
-            user_id=current_user.id
-        )
+        value_pairs.append({
+            "value": value,
+            "score": score
+        })
 
-        db.add(db_value_compass)
-        db.commit()
-        db.refresh(db_value_compass)
+    # single commit
+    db.commit()
 
-        top_values = extract_top_values([db_identity_anchor.description])
+    # log event
+    log_event(
+        db,
+        session.id,
+        "identity_anchor_created",
+        payload={
+            "description": payload.description,
+            "values": value_pairs
+        }
+    )
 
-        value_pairs = []
-
-        for value, score in top_values:
-
-            db_value_score = ValueScore(
-                value_compass_id=db_value_compass.id,
-                values=value,
-                scores=score
-            )
-
-            db.add(db_value_score)
-            db.commit()
-
-            value_pairs.append({
-                "value": value,
-                "score": score
-            })
-
-        log_event(
-            db,
-            session.id,
-            "identity_anchor_created",
-            payload={
-                "description": payload.description,
-                "values": value_pairs
-            }
-        )
-
-        return {"message": "Identity Anchor + Value Compass registered"}
-
-    finally:
-        db.close()
+    return {
+        "message": "Identity anchor created",
+        "values": value_pairs
+    }

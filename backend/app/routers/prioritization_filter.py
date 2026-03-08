@@ -1,20 +1,19 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Annotated
 
 from db.session import get_db
 from app.auth import get_current_user
 from app.services.decision_logger import start_decision_session, log_event
+
 from app.ai.rank_commitments_from_values import rank_commitments_from_values
 from app.ai.rank_commitments_from_wisdom import rank_commitments_from_wisdom
-
-from schemas.commitment import CommitmentCreate
 
 from models.user import User
 from models.value_compass import ValueCompass
 from models.value_score import ValueScore
-
 from models.decision_context import DecisionContext
+
 
 router = APIRouter()
 
@@ -23,12 +22,17 @@ DBSession = Annotated[Session, Depends(get_db)]
 
 @router.post("/prioritization_filter")
 def create_prioritization_filter(
-    db: DBSession, 
+    db: DBSession,
     current_user: User = Depends(get_current_user)
 ):
 
-    session = start_decision_session(db, current_user.id, "prioritization_filter")
+    session = start_decision_session(
+        db,
+        current_user.id,
+        "prioritization_filter"
+    )
 
+    # latest decision context
     latest_decision_context = (
         db.query(DecisionContext)
         .filter(DecisionContext.user_id == current_user.id)
@@ -37,14 +41,21 @@ def create_prioritization_filter(
     )
 
     if not latest_decision_context:
-        return {"error": "Decision context not found"}
+        raise HTTPException(
+            status_code=404,
+            detail="Decision context not found"
+        )
 
+    # latest value compass
     latest_value_compass = (
         db.query(ValueCompass)
         .filter(ValueCompass.user_id == current_user.id)
         .order_by(ValueCompass.created_at.desc())
         .first()
     )
+
+    priorities = []
+    mode = None
 
     if latest_value_compass:
 
@@ -56,7 +67,8 @@ def create_prioritization_filter(
         )
 
         values_str = "\n".join(
-            [f"{v.values}: {round(v.scores, 2)}" for v in top_values]
+            f"{v.values}: {round(v.scores, 2)}"
+            for v in top_values
         )
 
         priorities = rank_commitments_from_values(
@@ -74,6 +86,7 @@ def create_prioritization_filter(
 
         mode = "wisdom"
 
+    # log event
     log_event(
         db,
         session.id,
@@ -85,11 +98,8 @@ def create_prioritization_filter(
         decision_context_id=latest_decision_context.id
     )
 
-    response = {
-        f"priority{i+1}": value
-        for i, value in enumerate(priorities)
+    return {
+        "mode": mode,
+        "decision_context": latest_decision_context.description,
+        "priorities": priorities
     }
-
-    response["mode"] = mode
-
-    return response

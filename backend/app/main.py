@@ -17,10 +17,7 @@ from app.routers import commitment
 from app.routers import execution
 from app.routers import metrics
 
-from models.user import User
-from models.identity_anchor import IdentityAnchor
-from models.value_compass import ValueCompass
-from models.value_score import ValueScore
+import models
 
 app = FastAPI()
 
@@ -32,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+print("Creating tables...")
 Base.metadata.create_all(bind=engine)
 
 # routers
@@ -59,10 +57,10 @@ def get_active_identity_anchor(
     user_id: str = Depends(get_current_user)
 ):
 
-    identity_anchor = db.query(IdentityAnchor).filter(
-        IdentityAnchor.user_id == user_id
+    identity_anchor = db.query(models.IdentityAnchor).filter(
+        models.IdentityAnchor.user_id == user_id
     ).order_by(
-        IdentityAnchor.created_at.desc()
+        models.IdentityAnchor.created_at.desc()
     ).first()
 
     if not identity_anchor:
@@ -88,12 +86,12 @@ def get_latest_value_compass(
 
     result = (
         db.query(
-            ValueScore.values.label("value"),
-            ValueScore.scores.label("score")
+            models.ValueScore.values.label("value"),
+            models.ValueScore.scores.label("score")
         )
-        .join(ValueCompass, ValueScore.value_compass_id == ValueCompass.id)
-        .filter(ValueCompass.user_id == user_id)
-        .order_by(ValueCompass.created_at.desc())
+        .join(models.ValueCompass, models.ValueScore.value_compass_id == models.ValueCompass.id)
+        .filter(models.ValueCompass.user_id == user_id)
+        .order_by(models.ValueCompass.created_at.desc())
         .all()
     )
 
@@ -110,9 +108,9 @@ def get_latest_value_compass(
 # sqlite3 test.db
 # finder: DB Browser for SQLite
 
-{
-  "commitment": "Test Commitment",
-  "source": "self_endorsed",
-  "start_time": "2026-03-08T10:00:00Z",
-  "end_time": "2026-03-08T11:00:00Z"
-}
+# {
+#   "commitment": "Test Commitment",
+#   "source": "self_endorsed",
+#   "start_time": "2026-03-08T10:00:00Z",
+#   "end_time": "2026-03-08T11:00:00Z"
+# }
